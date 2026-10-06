@@ -21,7 +21,7 @@ nest new minha-api
 cd minha-api
 ```
 
-Escolha **npm** como gerenciador de pacotes. Se o CLI perguntar pelo sistema de módulos, escolha **ESM (Module)**.
+Escolha **npm** como gerenciador de pacotes. NÃO utilizar @nestJs/observe.  Se o CLI perguntar pelo sistema de módulos, escolha **ESM (ES Module)**.
 
 
 ## 3. Iniciar a aplicação
