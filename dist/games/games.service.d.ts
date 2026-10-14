@@ -1,0 +1,156 @@
+import { Prisma } from '@prisma/client';
+import { PrismaService } from '../prisma/prisma.service';
+import { CreateGameDto } from './dto/create-game.dto';
+import { UpdateGameDto } from './dto/update-game.dto';
+export declare class GamesService {
+    private readonly prisma;
+    constructor(prisma: PrismaService);
+    create(dto: CreateGameDto): Promise<{
+        nome: string;
+        descricao: string | null;
+        valor_diaria: Prisma.Decimal;
+        quantidade_total: number;
+        ano_lancamento: number | null;
+        numero_jogadores_min: number;
+        numero_jogadores_max: number;
+        idade_minima: number;
+        duracao_minutos: number;
+        complexidade: number;
+        ativo: boolean;
+        quantidade_disponivel: number;
+        id: number;
+    }>;
+    findAll(): Prisma.PrismaPromise<{
+        nome: string;
+        descricao: string | null;
+        valor_diaria: Prisma.Decimal;
+        quantidade_total: number;
+        ano_lancamento: number | null;
+        numero_jogadores_min: number;
+        numero_jogadores_max: number;
+        idade_minima: number;
+        duracao_minutos: number;
+        complexidade: number;
+        ativo: boolean;
+        quantidade_disponivel: number;
+        id: number;
+    }[]>;
+    findAvailable(): Prisma.PrismaPromise<{
+        nome: string;
+        descricao: string | null;
+        valor_diaria: Prisma.Decimal;
+        quantidade_total: number;
+        ano_lancamento: number | null;
+        numero_jogadores_min: number;
+        numero_jogadores_max: number;
+        idade_minima: number;
+        duracao_minutos: number;
+        complexidade: number;
+        ativo: boolean;
+        quantidade_disponivel: number;
+        id: number;
+    }[]>;
+    findOne(id: number): Promise<{
+        nome: string;
+        descricao: string | null;
+        valor_diaria: Prisma.Decimal;
+        quantidade_total: number;
+        ano_lancamento: number | null;
+        numero_jogadores_min: number;
+        numero_jogadores_max: number;
+        idade_minima: number;
+        duracao_minutos: number;
+        complexidade: number;
+        ativo: boolean;
+        quantidade_disponivel: number;
+        id: number;
+    }>;
+    findRentals(id: number): Promise<({
+        usuario: {
+            nome: string;
+            id: number;
+            email: string;
+        };
+        pagamentos: {
+            id: number;
+            status: import(".prisma/client").$Enums.StatusPagamento;
+            id_aluguel: number;
+            valor: Prisma.Decimal;
+            data_pagamento: Date;
+            forma_pagamento: import(".prisma/client").$Enums.FormaPagamento | null;
+        }[];
+    } & {
+        valor_diaria: Prisma.Decimal;
+        id: number;
+        id_usuario: number;
+        id_jogo: number;
+        data_aluguel: Date;
+        data_prevista_devolucao: Date;
+        data_devolucao: Date | null;
+        quantidade: number;
+        valor_total: Prisma.Decimal | null;
+        status: import(".prisma/client").$Enums.StatusAluguel;
+        local: boolean;
+        observacoes: string | null;
+    })[]>;
+    update(id: number, dto: UpdateGameDto): Promise<{
+        nome: string;
+        descricao: string | null;
+        valor_diaria: Prisma.Decimal;
+        quantidade_total: number;
+        ano_lancamento: number | null;
+        numero_jogadores_min: number;
+        numero_jogadores_max: number;
+        idade_minima: number;
+        duracao_minutos: number;
+        complexidade: number;
+        ativo: boolean;
+        quantidade_disponivel: number;
+        id: number;
+    }>;
+    deactivate(id: number): Promise<{
+        nome: string;
+        descricao: string | null;
+        valor_diaria: Prisma.Decimal;
+        quantidade_total: number;
+        ano_lancamento: number | null;
+        numero_jogadores_min: number;
+        numero_jogadores_max: number;
+        idade_minima: number;
+        duracao_minutos: number;
+        complexidade: number;
+        ativo: boolean;
+        quantidade_disponivel: number;
+        id: number;
+    }>;
+    activate(id: number): Promise<{
+        nome: string;
+        descricao: string | null;
+        valor_diaria: Prisma.Decimal;
+        quantidade_total: number;
+        ano_lancamento: number | null;
+        numero_jogadores_min: number;
+        numero_jogadores_max: number;
+        idade_minima: number;
+        duracao_minutos: number;
+        complexidade: number;
+        ativo: boolean;
+        quantidade_disponivel: number;
+        id: number;
+    }>;
+    remove(id: number): Promise<{
+        nome: string;
+        descricao: string | null;
+        valor_diaria: Prisma.Decimal;
+        quantidade_total: number;
+        ano_lancamento: number | null;
+        numero_jogadores_min: number;
+        numero_jogadores_max: number;
+        idade_minima: number;
+        duracao_minutos: number;
+        complexidade: number;
+        ativo: boolean;
+        quantidade_disponivel: number;
+        id: number;
+    }>;
+}
