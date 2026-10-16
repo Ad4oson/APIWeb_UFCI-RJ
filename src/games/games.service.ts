@@ -170,4 +170,14 @@ export class GamesService {
 
     return this.prisma.jogo.delete({ where: { id } });
   }
+
+  //Busca um jogo por categoria
+  async findCategories(id: number) {
+    await this.findOne(id);
+
+    return this.prisma.categoriaJogo.findMany({
+      where: { id_jogo: id,},
+      include: { categoria: true, }
+    });
+  }
 }

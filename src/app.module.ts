@@ -7,11 +7,15 @@ import { PaymentsModule } from './payments/payments.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { RentalsModule } from './rentals/rentals.module';
 import { UsersModule } from './users/users.module';
+import { ReviewsModule } from './reviews/reviews.module';
+import { CategoriesModule } from './categories/categories.module';
 
 export const { ObserveModule, ObserveInstrument } = createObserveModule();
 
 @Module({
   imports: [
+    CategoriesModule,
+    ReviewsModule,
     PrismaModule,
     UsersModule,
     GamesModule,
