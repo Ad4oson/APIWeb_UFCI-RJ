@@ -69,4 +69,12 @@ export class GamesController {
   remove(@Param('id', ParseIntPipe) id: number) {
     return this.games.remove(id);
   }
+
+  //Busca um jogo pela categoria
+  @Get(':id/categories')
+  findCategories(
+    @Param('id', ParseIntPipe) id: number,
+  ) {
+    return this.games.findCategories(id);
+  }
 }
