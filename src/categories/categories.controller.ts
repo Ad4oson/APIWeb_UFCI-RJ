@@ -50,14 +50,6 @@ export class CategoriesController {
         return this.categories.update(id, dto);
     }
     
-    //Remove uma categoria
-    @Delete(':id')
-    remove(
-        @Param('id', ParseIntPipe) id: number,
-    ) {
-        return this.categories.remove(id);
-    }
-
     //Associa uma categoria a um jogo
     @Post('games')
     linkGame(
@@ -91,4 +83,13 @@ export class CategoriesController {
     ) {
         return this.categories.findAvailableGames(id);
     }
+
+    //Remove uma categoria
+    @Delete(':id')
+    remove(
+        @Param('id', ParseIntPipe) id: number,
+    ) {
+        return this.categories.remove(id);
+    }
+
 }
