@@ -3,307 +3,192 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { Prisma, StatusAluguel, StatusPagamento } from '@prisma/client';
-import { PrismaService } from '../prisma/prisma.service';
+import { Prisma, StatusAluguel } from '@prisma/client';
+import { RentalsRepository } from './rentals.repository';
 import { CreateRentalDto } from './dto/create-rental.dto';
 import { ExtendRentalDto } from './dto/extend-rental.dto';
 import { ListRentalsDto } from './dto/list-rentals.dto';
 
-const rentalDetails = {
-  usuario: { select: { id: true, nome: true, email: true } },
-  jogo: true,
-  pagamentos: true,
-} satisfies Prisma.AluguelInclude;
-
 @Injectable()
 export class RentalsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(private readonly repository: RentalsRepository) {}
+
+  private adicionarDias(data: Date, dias: number): Date {
+    const resultado = new Date(data);
+    resultado.setDate(resultado.getDate() + dias);
+    return resultado;
+  }
+
+  private comecoDoDia(data: Date): Date {
+    const resultado = new Date(data);
+    resultado.setHours(0, 0, 0, 0);
+    return resultado;
+  }
+
+  private diasDeAluguel(inicio: Date, fim: Date): number {
+    return Math.max(
+      1,
+      Math.ceil((this.comecoDoDia(fim).getTime() - this.comecoDoDia(inicio).getTime()) / 86_400_000),
+    );
+  }
 
   async create(dto: CreateRentalDto) {
-    const dueDate = dto.data_prevista_devolucao ?? this.addDays(new Date(), 7);
-    if (this.startOfDay(dueDate) <= this.startOfDay(new Date())) {
-      throw new BadRequestException('A devolução prevista deve ser futura.');
+    const previsao = dto.data_prevista_devolucao ?? this.adicionarDias(new Date(), 7);
+    
+    if (this.comecoDoDia(previsao) <= this.comecoDoDia(new Date())) {
+      throw new BadRequestException('A devolução prevista deve ser para o futuro.');
     }
 
-    return this.prisma.$transaction(async (tx) => {
-      const [usuario, jogo] = await Promise.all([
-        tx.usuario.findUnique({ where: { id: dto.id_usuario } }),
-        tx.jogo.findUnique({ where: { id: dto.id_jogo } }),
-      ]);
+    const usuario = await this.repository.buscarUsuario(dto.id_usuario);
+    if (!usuario) throw new NotFoundException('Usuário não encontrado.');
+    if (!usuario.ativo) {
+      throw new BadRequestException('Usuário inativo não pode alugar jogo.');
+    }
 
-      if (!usuario) throw new NotFoundException('Usuário não encontrado.');
-      if (!usuario.ativo) {
-        throw new BadRequestException('O usuário está inativo e não pode alugar.');
-      }
-      if (!jogo) throw new NotFoundException('Jogo não encontrado.');
-      if (!jogo.ativo) {
-        throw new BadRequestException('O jogo está inativo e não pode ser alugado.');
-      }
+    const jogo = await this.repository.buscarJogo(dto.id_jogo);
+    if (!jogo) throw new NotFoundException('Jogo não encontrado.');
+    if (!jogo.ativo) {
+      throw new BadRequestException('Este jogo está inativo.');
+    }
 
-      // O decremento condicional torna a checagem e a reserva atômicas, evitando estoque negativo em requisições concorrentes.
-      const reservation = await tx.jogo.updateMany({
-        where: {
-          id: jogo.id,
-          ativo: true,
-          quantidade_disponivel: { gte: dto.quantidade },
-        },
-        data: { quantidade_disponivel: { decrement: dto.quantidade } },
-      });
-      if (reservation.count !== 1) {
-        throw new BadRequestException('Estoque insuficiente para a quantidade solicitada.');
-      }
+    const dias = this.diasDeAluguel(new Date(), previsao);
+    const valorTotal = jogo.valor_diaria.mul(dto.quantidade).mul(dias);
 
-      const rentalDays = Math.max(
-        1,
-        Math.ceil(
-          (this.startOfDay(dueDate).getTime() -
-            this.startOfDay(new Date()).getTime()) /
-            86_400_000,
-        ),
+    try {
+      return await this.repository.criarAluguel(
+        usuario.id,
+        jogo.id,
+        dto.quantidade,
+        previsao,
+        jogo.valor_diaria,
+        valorTotal,
+        dto.local,
+        dto.observacoes
       );
-      return tx.aluguel.create({
-        data: {
-          id_usuario: usuario.id,
-          id_jogo: jogo.id,
-          quantidade: dto.quantidade,
-          data_prevista_devolucao: dueDate,
-          valor_diaria: jogo.valor_diaria,
-          valor_total: jogo.valor_diaria.mul(dto.quantidade).mul(rentalDays),
-          local: dto.local,
-          observacoes: dto.observacoes,
-        },
-        include: rentalDetails,
-      });
-    });
+    } catch (erro: any) {
+      if (erro.message === 'ESTOQUE_INSUFICIENTE') {
+        throw new BadRequestException('Estoque insuficiente para essa quantidade.');
+      }
+      throw erro;
+    }
   }
 
   async findAll(query: ListRentalsDto) {
     const page = query.page ?? 1;
     const limit = Math.min(query.limit ?? 20, 100);
-    const where: Prisma.AluguelWhereInput = query.status
-      ? { status: query.status }
-      : {};
-    const [data, total] = await this.prisma.$transaction([
-      this.prisma.aluguel.findMany({
-        where,
-        include: rentalDetails,
-        orderBy: { data_aluguel: 'desc' },
-        skip: (page - 1) * limit,
-        take: limit,
-      }),
-      this.prisma.aluguel.count({ where }),
-    ]);
-    return { data, meta: { page, limit, total, pages: Math.ceil(total / limit) } };
+    const pular = (page - 1) * limit;
+
+    const where: Prisma.AluguelWhereInput = query.status ? { status: query.status } : {};
+
+    const [registros, total] = await this.repository.listar(where, pular, limit);
+    
+    return { data: registros, meta: { page, limit, total, pages: Math.ceil(total / limit) } };
   }
 
   async findOne(id: number) {
-    const rental = await this.prisma.aluguel.findUnique({
-      where: { id },
-      include: rentalDetails,
-    });
-    if (!rental) throw new NotFoundException('Aluguel não encontrado.');
-    return rental;
+    const aluguel = await this.repository.buscarPorId(id);
+    if (!aluguel) throw new NotFoundException('Aluguel não encontrado.');
+    return aluguel;
   }
 
   async returnRental(id: number) {
-    return this.prisma.$transaction(async (tx) => {
-      const rental = await tx.aluguel.findUnique({ where: { id } });
-      if (!rental) throw new NotFoundException('Aluguel não encontrado.');
-      if (
-        rental.status !== StatusAluguel.ATIVO &&
-        rental.status !== StatusAluguel.ATRASADO
-      ) {
-        throw new BadRequestException('Este aluguel não pode ser devolvido.');
-      }
+    const aluguel = await this.findOne(id);
 
-      const returnedAt = new Date();
-      const lateDays = Math.max(
-        0,
-        Math.ceil(
-          (this.startOfDay(returnedAt).getTime() -
-            this.startOfDay(rental.data_prevista_devolucao).getTime()) /
-            86_400_000,
-        ),
+    if (aluguel.status !== StatusAluguel.ATIVO && aluguel.status !== StatusAluguel.ATRASADO) {
+      throw new BadRequestException('Este aluguel não pode ser devolvido.');
+    }
+
+    const devolvidoEm = new Date();
+    const diasDeAtraso = Math.max(
+      0,
+      Math.ceil((this.comecoDoDia(devolvidoEm).getTime() - this.comecoDoDia(aluguel.data_prevista_devolucao).getTime()) / 86_400_000)
+    );
+
+    const multa = new Prisma.Decimal(aluguel.valor_diaria).mul(diasDeAtraso).mul(aluguel.quantidade);
+    
+    const valorContrato = aluguel.valor_total ?? new Prisma.Decimal(aluguel.valor_diaria)
+        .mul(aluguel.quantidade)
+        .mul(this.diasDeAluguel(aluguel.data_aluguel, aluguel.data_prevista_devolucao));
+
+    const novoValorTotal = valorContrato.add(multa);
+
+    try {
+      const { atualizado, finePayment } = await this.repository.devolver(
+        id, devolvidoEm, novoValorTotal, aluguel.quantidade, aluguel.id_jogo, multa
       );
-      // A multa adotada é a diária do contrato multiplicada pelos dias corridos de atraso e unidades alugadas.
-      const fine = new Prisma.Decimal(rental.valor_diaria)
-        .mul(lateDays)
-        .mul(rental.quantidade);
-      const contractedTotal =
-        rental.valor_total ??
-        new Prisma.Decimal(rental.valor_diaria)
-          .mul(rental.quantidade)
-          .mul(this.rentalDays(rental.data_aluguel, rental.data_prevista_devolucao));
-
-      const transition = await tx.aluguel.updateMany({
-        where: {
-          id,
-          status: { in: [StatusAluguel.ATIVO, StatusAluguel.ATRASADO] },
-        },
-        data: {
-          status: StatusAluguel.DEVOLVIDO,
-          data_devolucao: returnedAt,
-          valor_total: contractedTotal.add(fine),
-        },
-      });
-      if (transition.count !== 1) {
+      
+      return { ...atualizado, dias_atraso: diasDeAtraso, multa, pagamento_multa: finePayment };
+    } catch (erro: any) {
+      if (erro.message === 'NAO_PODE_DEVOLVER') {
         throw new BadRequestException('Este aluguel já foi alterado e não pode ser devolvido.');
       }
-      await tx.jogo.update({
-        where: { id: rental.id_jogo },
-        data: { quantidade_disponivel: { increment: rental.quantidade } },
-      });
-
-      let finePayment = null;
-      if (fine.greaterThan(0)) {
-        finePayment = await tx.pagamento.create({
-          data: {
-            id_aluguel: id,
-            valor: fine,
-            forma_pagamento: null,
-            status: StatusPagamento.PENDENTE,
-          },
-        });
-      }
-      const updated = await tx.aluguel.findUniqueOrThrow({ where: { id } });
-      return { ...updated, dias_atraso: lateDays, multa: fine, pagamento_multa: finePayment };
-    });
+      throw erro;
+    }
   }
 
   async cancel(id: number) {
-    return this.prisma.$transaction(async (tx) => {
-      const rental = await tx.aluguel.findUnique({ where: { id } });
-      if (!rental) throw new NotFoundException('Aluguel não encontrado.');
-      if (rental.status !== StatusAluguel.ATIVO) {
-        throw new BadRequestException('Somente aluguéis ativos podem ser cancelados.');
+    const aluguel = await this.findOne(id);
+    
+    if (aluguel.status !== StatusAluguel.ATIVO) {
+      throw new BadRequestException('Somente aluguéis ativos podem ser cancelados.');
+    }
+
+    try {
+      return await this.repository.cancelar(id, aluguel.quantidade, aluguel.id_jogo);
+    } catch (erro: any) {
+      if (erro.message === 'NAO_PODE_CANCELAR') {
+         throw new BadRequestException('Aluguel já foi alterado.');
       }
-      const transition = await tx.aluguel.updateMany({
-        where: { id, status: StatusAluguel.ATIVO },
-        data: { status: StatusAluguel.CANCELADO },
-      });
-      if (transition.count !== 1) {
-        throw new BadRequestException('Este aluguel já foi alterado e não pode ser cancelado.');
-      }
-      await tx.jogo.update({
-        where: { id: rental.id_jogo },
-        data: { quantidade_disponivel: { increment: rental.quantidade } },
-      });
-      return tx.aluguel.findUniqueOrThrow({ where: { id } });
-    });
+      throw erro;
+    }
   }
 
   async findByUser(userId: number) {
-    const user = await this.prisma.usuario.findUnique({ where: { id: userId } });
-    if (!user) throw new NotFoundException('Usuário não encontrado.');
-    return this.prisma.aluguel.findMany({
-      where: { id_usuario: userId },
-      include: rentalDetails,
-      orderBy: { data_aluguel: 'desc' },
-    });
+    const usuario = await this.repository.buscarUsuario(userId);
+    if (!usuario) throw new NotFoundException('Usuário não encontrado.');
+    return this.repository.buscarPorUsuarioLista(userId);
   }
 
   findActive() {
-    const today = this.startOfDay(new Date());
-    return this.prisma.aluguel.findMany({
-      where: {
-        status: StatusAluguel.ATIVO,
-        data_prevista_devolucao: { gte: today },
-      },
-      include: rentalDetails,
-      orderBy: { data_prevista_devolucao: 'asc' },
-    });
+    const hoje = this.comecoDoDia(new Date());
+    return this.repository.buscarAtivosLista(hoje);
   }
 
   async findOverdue() {
-    const today = this.startOfDay(new Date());
-    await this.prisma.aluguel.updateMany({
-      where: {
-        status: StatusAluguel.ATIVO,
-        data_prevista_devolucao: { lt: today },
-      },
-      data: { status: StatusAluguel.ATRASADO },
-    });
-    return this.prisma.aluguel.findMany({
-      where: {
-        status: StatusAluguel.ATRASADO,
-        data_prevista_devolucao: { lt: today },
-      },
-      include: rentalDetails,
-      orderBy: { data_prevista_devolucao: 'asc' },
-    });
+    const hoje = this.comecoDoDia(new Date());
+    return this.repository.processarAtrasados(hoje);
   }
 
   async extend(id: number, dto: ExtendRentalDto) {
-    const rental = await this.prisma.aluguel.findUnique({ where: { id } });
-    if (!rental) throw new NotFoundException('Aluguel não encontrado.');
-    if (
-      rental.status !== StatusAluguel.ATIVO &&
-      rental.status !== StatusAluguel.ATRASADO
-    ) {
+    const aluguel = await this.findOne(id);
+    
+    if (aluguel.status !== StatusAluguel.ATIVO && aluguel.status !== StatusAluguel.ATRASADO) {
       throw new BadRequestException('Somente aluguéis não devolvidos podem ser prorrogados.');
     }
-    const extendedDate = this.addDays(
-      new Date(rental.data_prevista_devolucao),
-      dto.dias,
+
+    const novaData = this.adicionarDias(new Date(aluguel.data_prevista_devolucao), dto.dias);
+    
+    const valorOriginal = aluguel.valor_total ?? new Prisma.Decimal(aluguel.valor_diaria)
+        .mul(aluguel.quantidade)
+        .mul(this.diasDeAluguel(aluguel.data_aluguel, aluguel.data_prevista_devolucao));
+        
+    const novoValor = valorOriginal.add(
+      new Prisma.Decimal(aluguel.valor_diaria).mul(aluguel.quantidade).mul(dto.dias)
     );
-    const contractedTotal =
-      rental.valor_total ??
-      new Prisma.Decimal(rental.valor_diaria)
-        .mul(rental.quantidade)
-        .mul(this.rentalDays(rental.data_aluguel, rental.data_prevista_devolucao));
-    return this.prisma.aluguel.update({
-      where: { id },
-      data: {
-        data_prevista_devolucao: extendedDate,
-        valor_total: contractedTotal.add(
-          new Prisma.Decimal(rental.valor_diaria).mul(rental.quantidade).mul(dto.dias),
-        ),
-        status: StatusAluguel.ATIVO,
-      },
-      include: rentalDetails,
-    });
+
+    return this.repository.prorrogarPrazo(id, novaData, novoValor);
   }
 
   async remove(id: number) {
-    return this.prisma.$transaction(async (tx) => {
-      const rental = await tx.aluguel.findUnique({ where: { id } });
-      if (!rental) throw new NotFoundException('Aluguel não encontrado.');
-      if (rental.status === StatusAluguel.ATIVO || rental.status === StatusAluguel.ATRASADO) {
-        await tx.jogo.update({
-          where: { id: rental.id_jogo },
-          data: { quantidade_disponivel: { increment: rental.quantidade } },
-        });
+    const aluguel = await this.findOne(id);
+
+    try {
+      return await this.repository.excluir(id, aluguel.status, aluguel.quantidade, aluguel.id_jogo);
+    } catch (erro: any) {
+      if (erro instanceof Prisma.PrismaClientKnownRequestError && erro.code === 'P2003') {
+        throw new BadRequestException('Não é possível apagar um aluguel que tem pagamentos registrados.');
       }
-      try {
-        return await tx.aluguel.delete({ where: { id } });
-      } catch (error) {
-        if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2003') {
-          throw new BadRequestException('Não é possível remover um aluguel com pagamentos vinculados.');
-        }
-        throw error;
-      }
-    });
-  }
-
-  private addDays(date: Date, days: number): Date {
-    const result = new Date(date);
-    result.setDate(result.getDate() + days);
-    return result;
-  }
-
-  private startOfDay(date: Date): Date {
-    const result = new Date(date);
-    result.setHours(0, 0, 0, 0);
-    return result;
-  }
-
-  private rentalDays(start: Date, end: Date): number {
-    return Math.max(
-      1,
-      Math.ceil(
-        (this.startOfDay(end).getTime() - this.startOfDay(start).getTime()) /
-          86_400_000,
-      ),
-    );
+      throw erro;
+    }
   }
 }

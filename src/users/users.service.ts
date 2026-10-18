@@ -4,21 +4,10 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { Prisma, StatusAluguel } from '@prisma/client';
 import { randomBytes, scryptSync } from 'node:crypto';
-import { PrismaService } from '../prisma/prisma.service';
+import { UsersRepository } from './users.repository';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
-
-const dadosPublicosUsuario = {
-  id: true,
-  nome: true,
-  email: true,
-  telefone: true,
-  cpf: true,
-  data_cadastro: true,
-  ativo: true,
-} satisfies Prisma.UsuarioSelect;
 
 function gerarHashSenha(senha: string): string {
   const salt = randomBytes(16).toString('hex');
@@ -28,134 +17,93 @@ function gerarHashSenha(senha: string): string {
 
 @Injectable()
 export class UsersService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(private readonly repository: UsersRepository) {}
 
   async create(dto: CreateUserDto) {
-    const usuarioExistente = await this.prisma.usuario.findUnique({
-      where: { email: dto.email },
-      select: { id: true },
-    });
-    if (usuarioExistente) {
+    const jaExiste = await this.repository.buscarPorEmail(dto.email);
+    if (jaExiste) {
       throw new ConflictException('Este e-mail já está cadastrado.');
     }
 
-    return this.prisma.usuario.create({
-      data: {
-        nome: dto.nome,
-        email: dto.email,
-        senha: gerarHashSenha(dto.senha),
-        telefone: dto.telefone,
-      },
-      select: dadosPublicosUsuario,
-    });
+    const dadosNovoUsuario = {
+      nome: dto.nome,
+      email: dto.email,
+      senha: gerarHashSenha(dto.senha),
+      telefone: dto.telefone,
+    };
+
+    return this.repository.criar(dadosNovoUsuario);
   }
 
   findAll() {
-    return this.prisma.usuario.findMany({
-      select: dadosPublicosUsuario,
-      orderBy: { nome: 'asc' },
-    });
+    return this.repository.buscarTodos();
   }
 
   findActive() {
-    return this.prisma.usuario.findMany({
-      where: { ativo: true },
-      select: dadosPublicosUsuario,
-      orderBy: { nome: 'asc' },
-    });
+    return this.repository.buscarAtivos();
   }
 
   async findOne(id: number) {
-    const usuario = await this.prisma.usuario.findUnique({
-      where: { id },
-      select: dadosPublicosUsuario,
-    });
-    if (!usuario) throw new NotFoundException('Usuário não encontrado.');
+    const usuario = await this.repository.buscarPorId(id);
+    if (!usuario) {
+      throw new NotFoundException('Usuário não encontrado.');
+    }
     return usuario;
   }
 
   async findRentals(id: number) {
-    await this.findOne(id);
-    return this.prisma.aluguel.findMany({
-      where: { id_usuario: id },
-      include: {
-        jogo: true,
-        pagamentos: true,
-      },
-      orderBy: { data_aluguel: 'desc' },
-    });
+    await this.findOne(id); // valida se o usuário existe primeiro
+    return this.repository.buscarAlugueisDoUsuario(id);
   }
 
   async update(id: number, dto: UpdateUserDto) {
     await this.findOne(id);
 
+    // se o cara tentar trocar de email, checa se não bate com o de outro
     if (dto.email) {
-      const usuarioComEmail = await this.prisma.usuario.findUnique({
-        where: { email: dto.email },
-        select: { id: true },
-      });
-      if (usuarioComEmail && usuarioComEmail.id !== id) {
+      const checkEmail = await this.repository.buscarPorEmail(dto.email);
+      if (checkEmail && checkEmail.id !== id) {
         throw new ConflictException('Este e-mail já está cadastrado.');
       }
     }
 
     const { senha, ...dados } = dto;
-    return this.prisma.usuario.update({
-      where: { id },
-      data: {
-        ...dados,
-        ...(senha !== undefined && { senha: gerarHashSenha(senha) }),
-      },
-      select: dadosPublicosUsuario,
-    });
+    const dadosAtualizados = {
+      ...dados,
+      ...(senha !== undefined && { senha: gerarHashSenha(senha) }),
+    };
+
+    return this.repository.atualizar(id, dadosAtualizados);
   }
 
   async deactivate(id: number) {
     await this.findOne(id);
 
-    const alugueisEmAndamento = await this.prisma.aluguel.count({
-      where: {
-        id_usuario: id,
-        status: { in: [StatusAluguel.ATIVO, StatusAluguel.ATRASADO] },
-      },
-    });
-    if (alugueisEmAndamento > 0) {
+    const pendentes = await this.repository.contarAlugueisAtivos(id);
+    if (pendentes > 0) {
       throw new BadRequestException(
         'Não é possível desativar um usuário com aluguéis em andamento.',
       );
     }
 
-    return this.prisma.usuario.update({
-      where: { id },
-      data: { ativo: false },
-      select: dadosPublicosUsuario,
-    });
+    return this.repository.mudarStatus(id, false);
   }
 
   async activate(id: number) {
     await this.findOne(id);
-    return this.prisma.usuario.update({
-      where: { id },
-      data: { ativo: true },
-      select: dadosPublicosUsuario,
-    });
+    return this.repository.mudarStatus(id, true);
   }
 
   async remove(id: number) {
     await this.findOne(id);
 
-    const historicoAlugueis = await this.prisma.aluguel.count({
-      where: { id_usuario: id },
-    });
-    if (historicoAlugueis > 0) {
+    const temHistorico = await this.repository.contarHistoricoAlugueis(id);
+    if (temHistorico > 0) {
       throw new BadRequestException(
         'Não é possível excluir um usuário que possui histórico de aluguéis.',
       );
     }
 
-    return this.prisma.usuario.delete({
-      where: { id },
-      select: dadosPublicosUsuario,
-    });
+    return this.repository.deletar(id);
   }
 }
