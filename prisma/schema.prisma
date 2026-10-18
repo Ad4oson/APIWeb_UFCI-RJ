@@ -33,39 +33,40 @@ enum StatusPagamento {
 // ================= MODELS =================
 
 model Usuario {
-  id            Int         @id @default(autoincrement())
-  nome          String      @db.VarChar(100)
-  email         String      @unique @db.VarChar(150)
-  senha         String      @db.VarChar(255)
-  telefone      String?     @db.VarChar(20)
-  cpf           String?     @unique @db.VarChar(14)
-  data_cadastro DateTime    @default(now())
-  ativo         Boolean     @default(true)
-  
-  alugueis      Aluguel[]
-  avaliacoes    Avaliacao[]
+  id            Int      @id @default(autoincrement())
+  nome          String   @db.VarChar(100)
+  email         String   @unique @db.VarChar(150)
+  senha         String   @db.VarChar(255)
+  telefone      String?  @db.VarChar(20)
+  cpf           String?  @unique @db.VarChar(14)
+  data_cadastro DateTime @default(now())
+  ativo         Boolean  @default(true)
+  role          String   @default("USER") @db.VarChar(20)
+
+  alugueis   Aluguel[]
+  avaliacoes Avaliacao[]
 
   @@map("usuario")
 }
 
 model Jogo {
-  id                    Int             @id @default(autoincrement())
-  nome                  String          @db.VarChar(150)
-  descricao             String?         @db.Text
-  ano_lancamento        Int?            @db.Year
+  id                    Int     @id @default(autoincrement())
+  nome                  String  @db.VarChar(150)
+  descricao             String? @db.Text
+  ano_lancamento        Int?    @db.Year
   numero_jogadores_min  Int
   numero_jogadores_max  Int
   idade_minima          Int
   duracao_minutos       Int
-  quantidade_total      Int             @default(1)
-  quantidade_disponivel Int             @default(1)
-  valor_diaria          Decimal         @db.Decimal(10,2)
-  ativo                 Boolean         @default(true)
+  quantidade_total      Int     @default(1)
+  quantidade_disponivel Int     @default(1)
+  valor_diaria          Decimal @db.Decimal(10, 2)
+  ativo                 Boolean @default(true)
   complexidade          Int
 
-  categorias            CategoriaJogo[]
-  alugueis              Aluguel[]
-  avaliacoes            Avaliacao[]
+  categorias CategoriaJogo[]
+  alugueis   Aluguel[]
+  avaliacoes Avaliacao[]
 
   @@index([nome], name: "idx_jogo_nome")
   @@map("jogo")
@@ -84,8 +85,8 @@ model CategoriaJogo {
   id_categoria Int
   id_jogo      Int
 
-  categoria    Categoria @relation(fields: [id_categoria], references: [id], onDelete: Cascade)
-  jogo         Jogo      @relation(fields: [id_jogo], references: [id], onDelete: Cascade)
+  categoria Categoria @relation(fields: [id_categoria], references: [id], onDelete: Cascade)
+  jogo      Jogo      @relation(fields: [id_jogo], references: [id], onDelete: Cascade)
 
   @@id([id_categoria, id_jogo])
   @@map("categoria_jogo")
@@ -99,15 +100,15 @@ model Aluguel {
   data_prevista_devolucao DateTime      @db.Date
   data_devolucao          DateTime?
   quantidade              Int           @default(1)
-  valor_diaria            Decimal       @db.Decimal(10,2)
-  valor_total             Decimal?      @db.Decimal(10,2)
+  valor_diaria            Decimal       @db.Decimal(10, 2)
+  valor_total             Decimal?      @db.Decimal(10, 2)
   status                  StatusAluguel @default(ATIVO)
   local                   Boolean       @default(false)
   observacoes             String?       @db.Text
 
-  usuario                 Usuario       @relation(fields: [id_usuario], references: [id], onUpdate: Cascade, onDelete: Restrict)
-  jogo                    Jogo          @relation(fields: [id_jogo], references: [id], onUpdate: Cascade, onDelete: Restrict)
-  pagamentos              Pagamento[]
+  usuario    Usuario     @relation(fields: [id_usuario], references: [id], onUpdate: Cascade, onDelete: Restrict)
+  jogo       Jogo        @relation(fields: [id_jogo], references: [id], onUpdate: Cascade, onDelete: Restrict)
+  pagamentos Pagamento[]
 
   @@index([id_usuario], name: "idx_aluguel_usuario")
   @@index([id_jogo], name: "idx_aluguel_jogo")
@@ -123,8 +124,8 @@ model Avaliacao {
   comentario     String?  @db.Text
   data_avaliacao DateTime @default(now())
 
-  usuario        Usuario  @relation(fields: [id_usuario], references: [id], onDelete: Cascade)
-  jogo           Jogo     @relation(fields: [id_jogo], references: [id], onDelete: Cascade)
+  usuario Usuario @relation(fields: [id_usuario], references: [id], onDelete: Cascade)
+  jogo    Jogo    @relation(fields: [id_jogo], references: [id], onDelete: Cascade)
 
   @@unique([id_usuario, id_jogo], name: "uk_usuario_jogo")
   @@index([id_jogo], name: "idx_avaliacao_jogo")
@@ -134,12 +135,12 @@ model Avaliacao {
 model Pagamento {
   id              Int             @id @default(autoincrement())
   id_aluguel      Int
-  valor           Decimal         @db.Decimal(10,2)
+  valor           Decimal         @db.Decimal(10, 2)
   data_pagamento  DateTime        @default(now())
   forma_pagamento FormaPagamento?
   status          StatusPagamento @default(PENDENTE)
 
-  aluguel         Aluguel         @relation(fields: [id_aluguel], references: [id], onUpdate: Cascade, onDelete: Restrict)
+  aluguel Aluguel @relation(fields: [id_aluguel], references: [id], onUpdate: Cascade, onDelete: Restrict)
 
   @@map("pagamento")
 }
