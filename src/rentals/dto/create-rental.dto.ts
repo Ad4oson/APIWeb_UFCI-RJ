@@ -1,3 +1,4 @@
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import {
   IsBoolean,
@@ -8,39 +9,68 @@ import {
   MaxLength,
   Min,
 } from 'class-validator';
-import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export class CreateRentalDto {
-  @ApiProperty({ example: 1, description: 'ID numérico do usuário', type: Number })
+  @ApiProperty({
+    description: 'Identificador do usuário que realizará o aluguel',
+    example: 1,
+    minimum: 1,
+    type: Number,
+  })
   @Type(() => Number)
   @IsInt()
   @Min(1)
   id_usuario!: number;
 
-  @ApiProperty({ example: 1, description: 'ID numérico do jogo', type: Number })
+  @ApiProperty({
+    description: 'Identificador do jogo que será alugado',
+    example: 1,
+    minimum: 1,
+    type: Number,
+  })
   @Type(() => Number)
   @IsInt()
   @Min(1)
   id_jogo!: number;
 
-  @ApiProperty({ example: 1, description: 'Quantidade de cópias para alugar', type: Number })
+  @ApiPropertyOptional({
+    description: 'Quantidade de cópias que serão alugadas',
+    example: 1,
+    default: 1,
+    minimum: 1,
+    type: Number,
+  })
   @Type(() => Number)
   @IsInt()
   @Min(1)
   quantidade = 1;
 
-  @ApiPropertyOptional({ example: '2026-10-24', description: 'Data combinada para a devolução', type: String, format: 'date' })
+  @ApiPropertyOptional({
+    description: 'Data prevista para a devolução',
+    example: '2026-10-24',
+    type: String,
+    format: 'date',
+  })
   @Type(() => Date)
   @IsOptional()
   @IsDate()
   data_prevista_devolucao?: Date;
 
-  @ApiPropertyOptional({ example: false, description: 'O aluguel será jogado no próprio local?', type: Boolean })
+  @ApiPropertyOptional({
+    description: 'Indica se o jogo será utilizado no local',
+    example: false,
+    default: false,
+    type: Boolean,
+  })
   @IsOptional()
   @IsBoolean()
   local = false;
 
-  @ApiPropertyOptional({ example: 'Cliente vai retirar no balcão', description: 'Anotações extras sobre o aluguel', type: String })
+  @ApiPropertyOptional({
+    description: 'Observações adicionais sobre o aluguel',
+    example: 'O cliente vai retirar o jogo no balcão.',
+    maxLength: 5000,
+  })
   @IsOptional()
   @IsString()
   @MaxLength(5000)
