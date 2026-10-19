@@ -74,6 +74,13 @@ export class UsersRepository {
     });
   }
 
+  async buscarPorCpf(cpf: string) {
+    return this.prisma.usuario.findUnique({
+      where: { cpf },
+      select: { id: true },
+    });
+  }
+
   async atualizar(id: number, data: any) {
     return this.prisma.usuario.update({
       where: { id },

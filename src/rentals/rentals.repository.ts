@@ -41,14 +41,14 @@ export class RentalsRepository {
   }
 
   async criarAluguel(
-    id_usuario: number, 
-    id_jogo: number, 
-    quantidade: number, 
-    data_prevista: Date, 
+    id_usuario: number,
+    id_jogo: number,
+    quantidade: number,
+    data_prevista: Date,
     valor_diaria: Prisma.Decimal,
     valor_total: Prisma.Decimal,
     local?: boolean,
-    observacoes?: string
+    observacoes?: string,
   ) {
     return this.prisma.$transaction(async (tx) => {
       const reserva = await tx.jogo.updateMany({
@@ -80,7 +80,14 @@ export class RentalsRepository {
     });
   }
 
-  async devolver(id: number, data_devolucao: Date, novoValorTotal: Prisma.Decimal, quantidade: number, id_jogo: number, multa: Prisma.Decimal) {
+  async devolver(
+    id: number,
+    data_devolucao: Date,
+    novoValorTotal: Prisma.Decimal,
+    quantidade: number,
+    id_jogo: number,
+    multa: Prisma.Decimal,
+  ) {
     return this.prisma.$transaction(async (tx) => {
       const transicao = await tx.aluguel.updateMany({
         where: {
@@ -139,7 +146,12 @@ export class RentalsRepository {
     });
   }
 
-  async excluir(id: number, status: StatusAluguel, quantidade: number, id_jogo: number) {
+  async excluir(
+    id: number,
+    status: StatusAluguel,
+    quantidade: number,
+    id_jogo: number,
+  ) {
     return this.prisma.$transaction(async (tx) => {
       if (status === StatusAluguel.ATIVO || status === StatusAluguel.ATRASADO) {
         await tx.jogo.update({
@@ -198,6 +210,17 @@ export class RentalsRepository {
         status: StatusAluguel.ATIVO,
       },
       include: detalhes,
+    });
+  }
+
+  async contarPagamentosPendentesDoUsuario(id_usuario: number) {
+    return this.prisma.pagamento.count({
+      where: {
+        status: StatusPagamento.PENDENTE,
+        aluguel: {
+          is: { id_usuario },
+        },
+      },
     });
   }
 }

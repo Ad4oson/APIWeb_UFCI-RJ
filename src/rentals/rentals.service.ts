@@ -28,21 +28,36 @@ export class RentalsService {
   private diasDeAluguel(inicio: Date, fim: Date): number {
     return Math.max(
       1,
-      Math.ceil((this.comecoDoDia(fim).getTime() - this.comecoDoDia(inicio).getTime()) / 86_400_000),
+      Math.ceil(
+        (this.comecoDoDia(fim).getTime() - this.comecoDoDia(inicio).getTime()) /
+          86_400_000,
+      ),
     );
   }
 
   async create(dto: CreateRentalDto) {
-    const previsao = dto.data_prevista_devolucao ?? this.adicionarDias(new Date(), 7);
-    
+    const previsao =
+      dto.data_prevista_devolucao ?? this.adicionarDias(new Date(), 7);
+
     if (this.comecoDoDia(previsao) <= this.comecoDoDia(new Date())) {
-      throw new BadRequestException('A devolução prevista deve ser para o futuro.');
+      throw new BadRequestException(
+        'A devolução prevista deve ser para o futuro.',
+      );
     }
 
     const usuario = await this.repository.buscarUsuario(dto.id_usuario);
     if (!usuario) throw new NotFoundException('Usuário não encontrado.');
     if (!usuario.ativo) {
       throw new BadRequestException('Usuário inativo não pode alugar jogo.');
+    }
+
+    const pagamentosPendentes =
+      await this.repository.contarPagamentosPendentesDoUsuario(usuario.id);
+
+    if (pagamentosPendentes > 0) {
+      throw new BadRequestException(
+        'Usuário com pagamentos pendentes não pode realizar novos aluguéis.',
+      );
     }
 
     const jogo = await this.repository.buscarJogo(dto.id_jogo);
@@ -63,11 +78,13 @@ export class RentalsService {
         jogo.valor_diaria,
         valorTotal,
         dto.local,
-        dto.observacoes
+        dto.observacoes,
       );
     } catch (erro: any) {
       if (erro.message === 'ESTOQUE_INSUFICIENTE') {
-        throw new BadRequestException('Estoque insuficiente para essa quantidade.');
+        throw new BadRequestException(
+          'Estoque insuficiente para essa quantidade.',
+        );
       }
       throw erro;
     }
@@ -78,11 +95,20 @@ export class RentalsService {
     const limit = Math.min(query.limit ?? 20, 100);
     const pular = (page - 1) * limit;
 
-    const where: Prisma.AluguelWhereInput = query.status ? { status: query.status } : {};
+    const where: Prisma.AluguelWhereInput = query.status
+      ? { status: query.status }
+      : {};
 
-    const [registros, total] = await this.repository.listar(where, pular, limit);
-    
-    return { data: registros, meta: { page, limit, total, pages: Math.ceil(total / limit) } };
+    const [registros, total] = await this.repository.listar(
+      where,
+      pular,
+      limit,
+    );
+
+    return {
+      data: registros,
+      meta: { page, limit, total, pages: Math.ceil(total / limit) },
+    };
   }
 
   async findOne(id: number) {
@@ -94,33 +120,62 @@ export class RentalsService {
   async returnRental(id: number) {
     const aluguel = await this.findOne(id);
 
-    if (aluguel.status !== StatusAluguel.ATIVO && aluguel.status !== StatusAluguel.ATRASADO) {
+    if (
+      aluguel.status !== StatusAluguel.ATIVO &&
+      aluguel.status !== StatusAluguel.ATRASADO
+    ) {
       throw new BadRequestException('Este aluguel não pode ser devolvido.');
     }
 
     const devolvidoEm = new Date();
     const diasDeAtraso = Math.max(
       0,
-      Math.ceil((this.comecoDoDia(devolvidoEm).getTime() - this.comecoDoDia(aluguel.data_prevista_devolucao).getTime()) / 86_400_000)
+      Math.ceil(
+        (this.comecoDoDia(devolvidoEm).getTime() -
+          this.comecoDoDia(aluguel.data_prevista_devolucao).getTime()) /
+          86_400_000,
+      ),
     );
 
-    const multa = new Prisma.Decimal(aluguel.valor_diaria).mul(diasDeAtraso).mul(aluguel.quantidade);
-    
-    const valorContrato = aluguel.valor_total ?? new Prisma.Decimal(aluguel.valor_diaria)
+    const multa = new Prisma.Decimal(aluguel.valor_diaria)
+      .div(2)
+      .mul(diasDeAtraso)
+      .mul(aluguel.quantidade);
+
+    const valorContrato =
+      aluguel.valor_total ??
+      new Prisma.Decimal(aluguel.valor_diaria)
         .mul(aluguel.quantidade)
-        .mul(this.diasDeAluguel(aluguel.data_aluguel, aluguel.data_prevista_devolucao));
+        .mul(
+          this.diasDeAluguel(
+            aluguel.data_aluguel,
+            aluguel.data_prevista_devolucao,
+          ),
+        );
 
     const novoValorTotal = valorContrato.add(multa);
 
     try {
       const { atualizado, finePayment } = await this.repository.devolver(
-        id, devolvidoEm, novoValorTotal, aluguel.quantidade, aluguel.id_jogo, multa
+        id,
+        devolvidoEm,
+        novoValorTotal,
+        aluguel.quantidade,
+        aluguel.id_jogo,
+        multa,
       );
-      
-      return { ...atualizado, dias_atraso: diasDeAtraso, multa, pagamento_multa: finePayment };
+
+      return {
+        ...atualizado,
+        dias_atraso: diasDeAtraso,
+        multa,
+        pagamento_multa: finePayment,
+      };
     } catch (erro: any) {
       if (erro.message === 'NAO_PODE_DEVOLVER') {
-        throw new BadRequestException('Este aluguel já foi alterado e não pode ser devolvido.');
+        throw new BadRequestException(
+          'Este aluguel já foi alterado e não pode ser devolvido.',
+        );
       }
       throw erro;
     }
@@ -128,16 +183,22 @@ export class RentalsService {
 
   async cancel(id: number) {
     const aluguel = await this.findOne(id);
-    
+
     if (aluguel.status !== StatusAluguel.ATIVO) {
-      throw new BadRequestException('Somente aluguéis ativos podem ser cancelados.');
+      throw new BadRequestException(
+        'Somente aluguéis ativos podem ser cancelados.',
+      );
     }
 
     try {
-      return await this.repository.cancelar(id, aluguel.quantidade, aluguel.id_jogo);
+      return await this.repository.cancelar(
+        id,
+        aluguel.quantidade,
+        aluguel.id_jogo,
+      );
     } catch (erro: any) {
       if (erro.message === 'NAO_PODE_CANCELAR') {
-         throw new BadRequestException('Aluguel já foi alterado.');
+        throw new BadRequestException('Aluguel já foi alterado.');
       }
       throw erro;
     }
@@ -161,19 +222,47 @@ export class RentalsService {
 
   async extend(id: number, dto: ExtendRentalDto) {
     const aluguel = await this.findOne(id);
-    
-    if (aluguel.status !== StatusAluguel.ATIVO && aluguel.status !== StatusAluguel.ATRASADO) {
-      throw new BadRequestException('Somente aluguéis não devolvidos podem ser prorrogados.');
+
+    if (
+      aluguel.status !== StatusAluguel.ATIVO &&
+      aluguel.status !== StatusAluguel.ATRASADO
+    ) {
+      throw new BadRequestException(
+        'Somente aluguéis não devolvidos podem ser prorrogados.',
+      );
     }
 
-    const novaData = this.adicionarDias(new Date(aluguel.data_prevista_devolucao), dto.dias);
-    
-    const valorOriginal = aluguel.valor_total ?? new Prisma.Decimal(aluguel.valor_diaria)
+    const hoje = this.comecoDoDia(new Date());
+    const vencimentoOriginal = this.comecoDoDia(
+      new Date(aluguel.data_prevista_devolucao),
+    );
+
+    if (aluguel.status !== StatusAluguel.ATIVO || vencimentoOriginal < hoje) {
+      throw new BadRequestException(
+        'Somente aluguéis ativos e ainda dentro do prazo podem ser prorrogados.',
+      );
+    }
+
+    const novaData = this.adicionarDias(
+      new Date(aluguel.data_prevista_devolucao),
+      dto.dias,
+    );
+
+    const valorOriginal =
+      aluguel.valor_total ??
+      new Prisma.Decimal(aluguel.valor_diaria)
         .mul(aluguel.quantidade)
-        .mul(this.diasDeAluguel(aluguel.data_aluguel, aluguel.data_prevista_devolucao));
-        
+        .mul(
+          this.diasDeAluguel(
+            aluguel.data_aluguel,
+            aluguel.data_prevista_devolucao,
+          ),
+        );
+
     const novoValor = valorOriginal.add(
-      new Prisma.Decimal(aluguel.valor_diaria).mul(aluguel.quantidade).mul(dto.dias)
+      new Prisma.Decimal(aluguel.valor_diaria)
+        .mul(aluguel.quantidade)
+        .mul(dto.dias),
     );
 
     return this.repository.prorrogarPrazo(id, novaData, novoValor);
@@ -183,10 +272,20 @@ export class RentalsService {
     const aluguel = await this.findOne(id);
 
     try {
-      return await this.repository.excluir(id, aluguel.status, aluguel.quantidade, aluguel.id_jogo);
+      return await this.repository.excluir(
+        id,
+        aluguel.status,
+        aluguel.quantidade,
+        aluguel.id_jogo,
+      );
     } catch (erro: any) {
-      if (erro instanceof Prisma.PrismaClientKnownRequestError && erro.code === 'P2003') {
-        throw new BadRequestException('Não é possível apagar um aluguel que tem pagamentos registrados.');
+      if (
+        erro instanceof Prisma.PrismaClientKnownRequestError &&
+        erro.code === 'P2003'
+      ) {
+        throw new BadRequestException(
+          'Não é possível apagar um aluguel que tem pagamentos registrados.',
+        );
       }
       throw erro;
     }

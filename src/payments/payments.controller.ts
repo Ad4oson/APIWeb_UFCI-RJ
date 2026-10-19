@@ -9,8 +9,16 @@ import {
   Post,
   Query,
   UseGuards,
+  UseInterceptors,
 } from '@nestjs/common';
-import { ApiOperation, ApiParam, ApiResponse, ApiTags } from '@nestjs/swagger';
+import { CacheInterceptor } from '@nestjs/cache-manager';
+import {
+  ApiOperation,
+  ApiParam,
+  ApiResponse,
+  ApiTags,
+  ApiBody,
+} from '@nestjs/swagger';
 import { AdminGuard } from '../common/guards/admin.guard';
 import { CreatePaymentDto } from './dto/create-payment.dto';
 import { ListPaymentsDto } from './dto/list-payments.dto';
@@ -24,6 +32,7 @@ export class PaymentsController {
   @ApiOperation({ summary: 'Criar pagamento' })
   @ApiResponse({ status: 201, description: 'Pagamento gerado com sucesso.' })
   @Post()
+  @ApiBody({ type: CreatePaymentDto })
   create(@Body() dto: CreatePaymentDto) {
     return this.payments.create(dto);
   }
@@ -31,12 +40,14 @@ export class PaymentsController {
   @ApiOperation({ summary: 'Listar pagamentos' })
   @ApiResponse({ status: 200, description: 'Lista paginada de transações.' })
   @Get()
+  @UseInterceptors(CacheInterceptor)
   findAll(@Query() query: ListPaymentsDto) {
     return this.payments.findAll(query);
   }
 
   @ApiOperation({ summary: 'Listar pagamentos pendentes' })
   @Get('pending')
+  @UseInterceptors(CacheInterceptor)
   findPending() {
     return this.payments.findPending();
   }
@@ -48,7 +59,11 @@ export class PaymentsController {
   }
 
   @ApiOperation({ summary: 'Buscar pagamentos por aluguel' })
-  @ApiParam({ name: 'rentalId', description: 'ID numérico do aluguel', type: Number })
+  @ApiParam({
+    name: 'rentalId',
+    description: 'ID numérico do aluguel',
+    type: Number,
+  })
   @ApiResponse({ status: 200, description: 'Faturas vinculadas ao aluguel.' })
   @Get('rental/:rentalId')
   findByRental(@Param('rentalId', ParseIntPipe) rentalId: number) {
@@ -56,7 +71,13 @@ export class PaymentsController {
   }
 
   @ApiOperation({ summary: 'Buscar pagamento por ID' })
-  @ApiParam({ name: 'id', description: 'ID numérico do pagamento', type: Number })
+  @ApiParam({
+    name: 'id',
+    description: 'ID numérico do pagamento',
+    type: Number,
+  })
+
+  
   @ApiResponse({ status: 200, description: 'Detalhes da transação.' })
   @Get(':id')
   findOne(@Param('id', ParseIntPipe) id: number) {
@@ -64,7 +85,11 @@ export class PaymentsController {
   }
 
   @ApiOperation({ summary: 'Calcular multa de atraso' })
-  @ApiParam({ name: 'rentalId', description: 'ID numérico do aluguel', type: Number })
+  @ApiParam({
+    name: 'rentalId',
+    description: 'ID numérico do aluguel',
+    type: Number,
+  })
   @ApiResponse({ status: 201, description: 'Cálculo de multa gerado.' })
   @Post('calculate-fine/:rentalId')
   calculateFine(@Param('rentalId', ParseIntPipe) rentalId: number) {
@@ -72,7 +97,11 @@ export class PaymentsController {
   }
 
   @ApiOperation({ summary: 'Confirmar compensação' })
-  @ApiParam({ name: 'id', description: 'ID numérico do pagamento', type: Number })
+  @ApiParam({
+    name: 'id',
+    description: 'ID numérico do pagamento',
+    type: Number,
+  })
   @ApiResponse({ status: 200, description: 'Transação confirmada.' })
   @Patch(':id/confirm')
   confirm(@Param('id', ParseIntPipe) id: number) {
@@ -80,7 +109,11 @@ export class PaymentsController {
   }
 
   @ApiOperation({ summary: 'Solicitar estorno' })
-  @ApiParam({ name: 'id', description: 'ID numérico do pagamento', type: Number })
+  @ApiParam({
+    name: 'id',
+    description: 'ID numérico do pagamento',
+    type: Number,
+  })
   @ApiResponse({ status: 200, description: 'Estorno processado.' })
   @Patch(':id/refund')
   refund(@Param('id', ParseIntPipe) id: number) {
@@ -88,8 +121,15 @@ export class PaymentsController {
   }
 
   @ApiOperation({ summary: 'Excluir registro de pagamento' })
-  @ApiParam({ name: 'id', description: 'ID numérico do pagamento', type: Number })
-  @ApiResponse({ status: 200, description: 'Registro apagado permanentemente.' })
+  @ApiParam({
+    name: 'id',
+    description: 'ID numérico do pagamento',
+    type: Number,
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Registro apagado permanentemente.',
+  })
   @Delete(':id')
   @UseGuards(AdminGuard)
   remove(@Param('id', ParseIntPipe) id: number) {

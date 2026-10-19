@@ -1,28 +1,48 @@
+import { ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import { IsDateString, IsInt, IsOptional, Min } from 'class-validator';
-import { ApiPropertyOptional } from '@nestjs/swagger';
 
 export class ListPaymentsDto {
-  @ApiPropertyOptional({ example: 1, description: 'Página dos resultados', type: Number })
+  @ApiPropertyOptional({
+    description: 'Número da página dos resultados',
+    example: 1,
+    default: 1,
+    minimum: 1,
+    type: Number,
+  })
   @Type(() => Number)
   @IsOptional()
   @IsInt()
   @Min(1)
   page = 1;
 
-  @ApiPropertyOptional({ example: 20, description: 'Itens por página', type: Number })
+  @ApiPropertyOptional({
+    description: 'Quantidade máxima de resultados por página',
+    example: 20,
+    default: 20,
+    minimum: 1,
+    type: Number,
+  })
   @Type(() => Number)
   @IsOptional()
   @IsInt()
   @Min(1)
   limit = 20;
 
-  @ApiPropertyOptional({ example: '2026-10-01', description: 'Data inicial do filtro' })
+  @ApiPropertyOptional({
+    description: 'Data inicial para filtrar os pagamentos',
+    example: '2026-10-01',
+    format: 'date',
+  })
   @IsOptional()
   @IsDateString()
   startDate?: string;
 
-  @ApiPropertyOptional({ example: '2026-10-31', description: 'Data final do filtro' })
+  @ApiPropertyOptional({
+    description: 'Data final para filtrar os pagamentos',
+    example: '2026-10-31',
+    format: 'date',
+  })
   @IsOptional()
   @IsDateString()
   endDate?: string;
