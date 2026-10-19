@@ -12,7 +12,7 @@ import {
     ApiResponse,
     ApiTags 
 } from '@nestjs/swagger';
- import { AuhtService } from './auth.service';
+ import { AuthService } from './auth.service';
  import { LoginDto } from './dto/login.dto';
  import { JwtAuthGuard } from './guards/jwt-auth.guard';
 
