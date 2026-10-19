@@ -7,15 +7,19 @@ import {
   ParseIntPipe,
   Patch,
   Post,
-  Query,
   UseInterceptors,
+  Query,
 } from '@nestjs/common';
 import { ApiBody, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { CacheInterceptor } from '@nestjs/cache-manager';
 import { CreateGameDto } from './dto/create-game.dto';
 import { UpdateGameDto } from './dto/update-game.dto';
 import { GamesService } from './games.service';
-import { ListGameReviewsDto } from '../reviews/dto/list-game-reviews.dto';
+import {
+  ListGameCategoriesDto,
+  ListGameRentalsDto,
+  ListGamesDto,
+} from './dto/list-games.dto';
 
 @ApiTags('Jogos')
 @Controller('games')
@@ -32,15 +36,15 @@ export class GamesController {
   @Get()
   @UseInterceptors(CacheInterceptor)
   @ApiOperation({ summary: 'Listar jogos' })
-  findAll() {
-    return this.games.findAll();
+  findAll(@Query() query: ListGamesDto) {
+    return this.games.findAll(query);
   }
 
   @Get('available')
-  @ApiOperation({ summary: 'Listar jogos ativos' })
   @UseInterceptors(CacheInterceptor)
-  findAvailable() {
-    return this.games.findAvailable();
+  @ApiOperation({ summary: 'Listar jogos disponíveis' })
+  findAvailable(@Query() query: ListGamesDto) {
+    return this.games.findAvailable(query);
   }
 
   @Get(':id/rentals')
@@ -75,6 +79,14 @@ export class GamesController {
     return this.games.activate(id);
   }
 
+  /** Exclui um jogo que não possua histórico de aluguéis. */
+  @Delete(':id')
+  @ApiOperation({ summary: 'Deleta jogo' })
+  remove(@Param('id', ParseIntPipe) id: number) {
+    return this.games.remove(id);
+  }
+
+  //Busca um jogo pela categoria
   @Get(':id/categories')
   @UseInterceptors(CacheInterceptor)
   @ApiOperation({ summary: 'Listar categorias do jogo' })

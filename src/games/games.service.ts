@@ -3,6 +3,11 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+import {
+  ListGameCategoriesDto,
+  ListGameRentalsDto,
+  ListGamesDto,
+} from './dto/list-games.dto';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateGameDto } from './dto/create-game.dto';
@@ -39,15 +44,66 @@ export class GamesService {
     });
   }
 
-  findAll() {
-    return this.prisma.jogo.findMany({ orderBy: { nome: 'asc' } });
+  private async listarJogos(
+    where: Prisma.JogoWhereInput,
+    page: number,
+    limit: number,
+  ) {
+    const [data, total] = await this.prisma.$transaction([
+      this.prisma.jogo.findMany({
+        where,
+        orderBy: { nome: 'asc' },
+        skip: (page - 1) * limit,
+        take: limit,
+      }),
+      this.prisma.jogo.count({ where }),
+    ]);
+
+    return {
+      data,
+      meta: { page, limit, total, pages: Math.ceil(total / limit) },
+    };
   }
 
-  findAvailable() {
-    return this.prisma.jogo.findMany({
-      where: { ativo: true, quantidade_disponivel: { gt: 0 } },
-      orderBy: { nome: 'asc' },
-    });
+  async findAvailable(query: ListGamesDto) {
+    const page = query.page ?? 1;
+    const limit = query.limit ?? 10;
+
+    const where: Prisma.JogoWhereInput = {
+      ativo: true,
+      quantidade_disponivel: { gt: 0 },
+      ...(query.nome && { nome: { contains: query.nome } }),
+      ...(query.complexidade !== undefined && {
+        complexidade: query.complexidade,
+      }),
+      ...(query.ano !== undefined && { ano_lancamento: query.ano }),
+      ...(query.jogadores !== undefined && {
+        numero_jogadores_min: { lte: query.jogadores },
+        numero_jogadores_max: { gte: query.jogadores },
+      }),
+    };
+
+    return this.listarJogos(where, page, limit);
+  }
+
+  async findAll(query: ListGamesDto) {
+    const page = query.page ?? 1;
+    const limit = query.limit ?? 10;
+
+    const where: Prisma.JogoWhereInput = {
+      ...(query.nome && { nome: { contains: query.nome } }),
+      ...(query.ativo !== undefined && { ativo: query.ativo }),
+      ...(query.complexidade !== undefined && {
+        complexidade: query.complexidade,
+      }),
+      ...(query.ano !== undefined && { ano_lancamento: query.ano }),
+      ...(query.jogadores !== undefined && {
+        numero_jogadores_min: { lte: query.jogadores },
+        numero_jogadores_max: { gte: query.jogadores },
+      }),
+    };
+
+    return this.listarJogos(where, page, limit);
   }
 
   async findOne(id: number) {
@@ -70,10 +126,8 @@ export class GamesService {
 
   async update(id: number, dto: UpdateGameDto) {
     const jogo = await this.findOne(id);
-    const minJogadores =
-      dto.numero_jogadores_min ?? jogo.numero_jogadores_min;
-    const maxJogadores =
-      dto.numero_jogadores_max ?? jogo.numero_jogadores_max;
+    const minJogadores = dto.numero_jogadores_min ?? jogo.numero_jogadores_min;
+    const maxJogadores = dto.numero_jogadores_max ?? jogo.numero_jogadores_max;
 
     if (minJogadores > maxJogadores) {
       throw new BadRequestException(
@@ -176,8 +230,8 @@ export class GamesService {
     await this.findOne(id);
 
     return this.prisma.categoriaJogo.findMany({
-      where: { id_jogo: id,},
-      include: { categoria: true, }
+      where: { id_jogo: id },
+      include: { categoria: true },
     });
   }
 }
