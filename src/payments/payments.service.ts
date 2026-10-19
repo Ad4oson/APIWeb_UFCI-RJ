@@ -23,10 +23,14 @@ export class PaymentsService {
 
   async create(dto: CreatePaymentDto) {
     return this.prisma.$transaction(async (tx) => {
-      const rental = await tx.aluguel.findUnique({ where: { id: dto.id_aluguel } });
+      const rental = await tx.aluguel.findUnique({
+        where: { id: dto.id_aluguel },
+      });
       if (!rental) throw new NotFoundException('Aluguel não encontrado.');
       if (rental.status === 'CANCELADO') {
-        throw new BadRequestException('Não é possível pagar um aluguel cancelado.');
+        throw new BadRequestException(
+          'Não é possível pagar um aluguel cancelado.',
+        );
       }
 
       const paidOrPending = await tx.pagamento.aggregate({
@@ -67,10 +71,13 @@ export class PaymentsService {
     const page = query.page ?? 1;
     const limit = Math.min(query.limit ?? 20, 100);
     const dateFilter: Prisma.DateTimeFilter = {};
-    if (query.startDate) dateFilter.gte = this.dateBoundary(query.startDate, false);
+    if (query.startDate)
+      dateFilter.gte = this.dateBoundary(query.startDate, false);
     if (query.endDate) dateFilter.lte = this.dateBoundary(query.endDate, true);
     if (query.startDate && query.endDate && dateFilter.gte! > dateFilter.lte!) {
-      throw new BadRequestException('startDate deve ser anterior ou igual a endDate.');
+      throw new BadRequestException(
+        'startDate deve ser anterior ou igual a endDate.',
+      );
     }
     const where: Prisma.PagamentoWhereInput =
       query.startDate || query.endDate ? { data_pagamento: dateFilter } : {};
@@ -84,7 +91,10 @@ export class PaymentsService {
       }),
       this.prisma.pagamento.count({ where }),
     ]);
-    return { data, meta: { page, limit, total, pages: Math.ceil(total / limit) } };
+    return {
+      data,
+      meta: { page, limit, total, pages: Math.ceil(total / limit) },
+    };
   }
 
   async findOne(id: number) {
@@ -97,7 +107,9 @@ export class PaymentsService {
   }
 
   async findByRental(rentalId: number) {
-    const rental = await this.prisma.aluguel.findUnique({ where: { id: rentalId } });
+    const rental = await this.prisma.aluguel.findUnique({
+      where: { id: rentalId },
+    });
     if (!rental) throw new NotFoundException('Aluguel não encontrado.');
     const payments = await this.prisma.pagamento.findMany({
       where: { id_aluguel: rentalId },
@@ -110,7 +122,12 @@ export class PaymentsService {
     const totalPendente = payments
       .filter((payment) => payment.status === StatusPagamento.PENDENTE)
       .reduce((sum, payment) => sum.add(payment.valor), new Prisma.Decimal(0));
-    return { aluguel: rental, pagamentos: payments, total_pago: totalPago, total_pendente: totalPendente };
+    return {
+      aluguel: rental,
+      pagamentos: payments,
+      total_pago: totalPago,
+      total_pendente: totalPendente,
+    };
   }
 
   async confirm(id: number) {
@@ -118,7 +135,9 @@ export class PaymentsService {
       const payment = await tx.pagamento.findUnique({ where: { id } });
       if (!payment) throw new NotFoundException('Pagamento não encontrado.');
       if (payment.status !== StatusPagamento.PENDENTE) {
-        throw new BadRequestException('Somente pagamentos pendentes podem ser confirmados.');
+        throw new BadRequestException(
+          'Somente pagamentos pendentes podem ser confirmados.',
+        );
       }
       return tx.pagamento.update({
         where: { id },
@@ -132,7 +151,9 @@ export class PaymentsService {
     const payment = await this.prisma.pagamento.findUnique({ where: { id } });
     if (!payment) throw new NotFoundException('Pagamento não encontrado.');
     if (payment.status !== StatusPagamento.PAGO) {
-      throw new BadRequestException('Somente pagamentos realizados podem ser estornados.');
+      throw new BadRequestException(
+        'Somente pagamentos realizados podem ser estornados.',
+      );
     }
     return this.prisma.pagamento.update({
       where: { id },
@@ -150,7 +171,9 @@ export class PaymentsService {
   }
 
   async calculateFine(rentalId: number) {
-    const rental = await this.prisma.aluguel.findUnique({ where: { id: rentalId } });
+    const rental = await this.prisma.aluguel.findUnique({
+      where: { id: rentalId },
+    });
     if (!rental) throw new NotFoundException('Aluguel não encontrado.');
     const today = new Date();
     const todayStart = new Date(today);
@@ -158,8 +181,12 @@ export class PaymentsService {
     const dueDate = new Date(rental.data_prevista_devolucao);
     dueDate.setHours(0, 0, 0, 0);
     // O cálculo usa dias corridos completos entre a data prevista e hoje, com a mesma fórmula aplicada na devolução.
-    const lateDays = Math.max(0, Math.ceil((todayStart.getTime() - dueDate.getTime()) / 86_400_000));
+    const lateDays = Math.max(
+      0,
+      Math.ceil((todayStart.getTime() - dueDate.getTime()) / 86_400_000),
+    );
     const fine = new Prisma.Decimal(rental.valor_diaria)
+      .div(2)
       .mul(lateDays)
       .mul(rental.quantidade);
     return {
@@ -178,7 +205,9 @@ export class PaymentsService {
       ? this.dateBoundary(query.endDate, true)
       : new Date();
     if (start > end) {
-      throw new BadRequestException('startDate deve ser anterior ou igual a endDate.');
+      throw new BadRequestException(
+        'startDate deve ser anterior ou igual a endDate.',
+      );
     }
     const where = {
       status: StatusPagamento.PAGO,
@@ -209,7 +238,9 @@ export class PaymentsService {
       payment.status !== StatusPagamento.PENDENTE &&
       payment.status !== StatusPagamento.CANCELADO
     ) {
-      throw new BadRequestException('Somente pagamentos pendentes ou cancelados podem ser excluídos.');
+      throw new BadRequestException(
+        'Somente pagamentos pendentes ou cancelados podem ser excluídos.',
+      );
     }
     return this.prisma.pagamento.delete({ where: { id } });
   }
@@ -222,7 +253,9 @@ export class PaymentsService {
 
   private dateBoundary(value: string, endOfDay: boolean): Date {
     if (/^\d{4}-\d{2}-\d{2}$/.test(value)) {
-      return new Date(`${value}T${endOfDay ? '23:59:59.999' : '00:00:00.000'}Z`);
+      return new Date(
+        `${value}T${endOfDay ? '23:59:59.999' : '00:00:00.000'}Z`,
+      );
     }
     return new Date(value);
   }
