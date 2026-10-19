@@ -14,6 +14,8 @@ import { CacheInterceptor } from '@nestjs/cache-manager';
 import { CreateGameDto } from './dto/create-game.dto';
 import { UpdateGameDto } from './dto/update-game.dto';
 import { GamesService } from './games.service';
+import { Query } from '@nestjs/common';
+import { ListGameReviewsDto } from '../reviews/dto/list-game-reviews.dto';
 
 @ApiTags('Jogos')
 @Controller('games')
@@ -94,5 +96,27 @@ export class GamesController {
   @ApiOperation({ summary: 'Listar  categorias do jogo'})
   findCategories(@Param('id', ParseIntPipe) id: number) {
     return this.games.findCategories(id);
+  }
+
+  @Get(':id/reviews')
+  findReviews(
+    @Param('id', ParseIntPipe) id: number,
+    @Query() query: ListGameReviewsDto,
+  ) {
+    return this.games.findReviews(id, query);
+  }
+
+  @Get(':id/reviews/stats')
+  findReviewStats(
+    @Param('id', ParseIntPipe) id: number,
+    @Query() query: ListGameReviewsDto,
+  ) {
+    return this.games.findReviewStats(id, query);
+  }
+  
+  /** Exclui um jogo que não possua histórico de aluguéis. */
+  @Delete(':id')
+  remove(@Param('id', ParseIntPipe) id: number) {
+    return this.games.remove(id);
   }
 }

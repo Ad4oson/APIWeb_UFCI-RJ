@@ -15,6 +15,9 @@ import { CreateReviewDto } from './dto/create-review.dto';
 import { UpdateReviewDto } from './dto/update-review.dto';
 import { ReviewsService } from './reviews.service';
 import { ParamsTokenFactory } from '@nestjs/core/internal';
+import { Query } from '@nestjs/common'
+import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
+import { ListReviewsDto } from './dto/list-reviews.dto'; 
 import { UpdateCategoryDto } from '../categories/dto/update-category.dto';
 
 @ApiTags('Avaliações')
@@ -34,8 +37,16 @@ export class ReviewsController {
         return this.reviews.create(dto);
     }
 
-    //Lista todas as avaliações cadastradas
+    @ApiOperation({
+        summary: 'Listar avaliações',
+    })
+    @ApiResponse({
+        status: 200,
+        description: 'Lista paginada de avaliações',
+    })
     @Get()
+    findAll(@Query() query: ListReviewsDto){
+        return this.reviews.findAll(query);
     @UseInterceptors(CacheInterceptor)
     @ApiOperation({ summary: 'Listar avaliações cadastradas'})
     findAll() {
