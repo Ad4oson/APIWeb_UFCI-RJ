@@ -7,6 +7,8 @@ import { CategoriesRepository } from './categories.repository';
 import { CreateCategoryDto } from './dto/create-category.dto';
 import { LinkCategoryGameDto } from './dto/link-category-game.dto';
 import { UpdateCategoryDto } from './dto/update-category.dto';
+import { ListCategoriesDto } from './dto/list-categories.dto';
+import { ListCategoryGamesDto } from './dto/list-category-games.dto';
 
 @Injectable()
 export class CategoriesService {
@@ -23,8 +25,8 @@ export class CategoriesService {
         return this.repository.criar(dto);
     }
 
-    findAll() {
-        return this.repository.buscarTodas();
+    async findAll(query: ListCategoriesDto) {
+        return this.repository.buscarTodas(query);
     }
 
     async findOne(id: number) {
@@ -77,13 +79,13 @@ export class CategoriesService {
         return this.repository.deslinkarJogo(dto.id_categoria, dto.id_jogo);
     }
 
-    async findGames(id: number) {
+    async findGames(id: number, query: ListCategoryGamesDto) {
         await this.findOne(id);
-        return this.repository.listarJogosDaCategoria(id);
+        return this.repository.listarJogosDaCategoria(id, false, query);
     }
 
-    async findAvailableGames(id: number) {
+    async findAvailableGames(id: number, query: ListCategoryGamesDto) {
         await this.findOne(id);
-        return this.repository.listarJogosDaCategoria(id, true);
+        return this.repository.listarJogosDaCategoria(id, true, query);
     }
 }

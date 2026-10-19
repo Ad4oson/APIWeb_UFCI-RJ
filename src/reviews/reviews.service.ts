@@ -7,6 +7,7 @@ import {
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateReviewDto } from './dto/create-review.dto';
 import { UpdateReviewDto } from './dto/update-review.dto';
+import { ListReviewsDto } from './dto/list-reviews.dto';
 
 @Injectable()
 export class ReviewsService {
@@ -59,15 +60,30 @@ export class ReviewsService {
         });
     }
 
-    findAll() {
-        return this.prisma.avaliacao.findMany({
-            include: {
-                usuario: {
-                    select: {
-                        id: true,
-                        nome: true,
+    async findAll(query: ListReviewsDto) {
+        const page = query.page ?? 1;
+        const limit = query.limit ?? 10;
+
+        const where: any = {};
+
+        if(query.id_jogo) {
+            where.id_jogo = query.id_jogo;
+        }
+
+        if(query.nota){
+            where.nota = query.nota;
+        }
+
+        const [data, total] = await Promise.all([
+            this.prisma.avaliacao.findMany({
+                where,
+                include: {
+                    usuario: {
+                        select: {
+                            id: true,
+                            nome: true,
+                        },
                     },
-                },
                 jogo: {
                     select: {
                         id: true,
@@ -78,7 +94,24 @@ export class ReviewsService {
             orderBy: {
                 data_avaliacao: 'desc',
             },
-        });
+            skip: (page - 1) * limit,
+            take: limit,
+            }),
+
+            this.prisma.avaliacao.count({
+                where,
+            }),
+        ]);
+
+        return {
+            data,
+            meta: {
+                page,
+                limit,
+                total,
+                pages: Math.ceil(total / limit),
+            },
+        };
     }
 
     async findOne(id: number) {

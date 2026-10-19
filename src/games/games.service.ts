@@ -7,6 +7,7 @@ import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateGameDto } from './dto/create-game.dto';
 import { UpdateGameDto } from './dto/update-game.dto';
+import { ListGameReviewsDto } from '../reviews/dto/list-game-reviews.dto';
 
 @Injectable()
 export class GamesService {
@@ -156,6 +157,105 @@ export class GamesService {
     });
   }
 
+  //Busca um jogo por categoria
+  async findCategories(id: number) {
+    await this.findOne(id);
+
+    return this.prisma.categoriaJogo.findMany({
+      where: { id_jogo: id,},
+      include: { categoria: true, }
+    });
+  }
+
+  //Acha um jogo atráves do review
+  async findReviews(
+    id: number,
+    query: ListGameReviewsDto,
+  ) {
+    await this.findOne(id);
+
+    const page = query.page ?? 1;
+    const limit = query.limit ?? 10;
+
+    const where: any = {
+      id_jogo: id,
+    };
+
+    if(query.nota) {
+      where.nota = query.nota;
+    }
+
+    if(query.usuario) {
+      where.usuario = {
+        nome: {
+          contains: query.usuario,
+        },
+      };
+    }
+    const [data, total] = await Promise.all([
+      this.prisma.avaliacao.findMany({
+        where,
+        include: {
+          usuario: true,
+        },
+        skip: (page - 1) * limit,
+        take: limit,
+        orderBy: {
+          data_avaliacao: 'desc',
+        },
+      }),
+      this.prisma.avaliacao.count({
+        where,
+      }),
+    ]);
+
+    return {
+      data,
+      meta: {
+        page,
+        limit,
+        total,
+        pages: Math.ceil(total / limit),
+      },
+    };
+  }
+
+  async findReviewStats(
+    id: number,
+    query: ListGameReviewsDto
+  ) {
+    await this.findOne(id);
+
+    const where: any = {
+      id_jogo: id,
+    };
+
+    if(query.nota) {
+      where.nota = query.nota;
+    }
+
+    const stats = await this.prisma.avaliacao.aggregate({
+      where,
+      _avg: {
+        nota: true,
+      },
+      _max: {
+        nota: true,
+      },
+      _min: {
+        nota: true,
+      },
+      _count: true,
+    });
+
+    return {
+      media: stats._avg.nota,
+      maiorNota: stats._max.nota,
+      menorNota: stats._min.nota,
+      totalAvaliacoes: stats._count,
+    };
+  }
+
   async remove(id: number) {
     await this.findOne(id);
 
@@ -169,15 +269,5 @@ export class GamesService {
     }
 
     return this.prisma.jogo.delete({ where: { id } });
-  }
-
-  //Busca um jogo por categoria
-  async findCategories(id: number) {
-    await this.findOne(id);
-
-    return this.prisma.categoriaJogo.findMany({
-      where: { id_jogo: id,},
-      include: { categoria: true, }
-    });
   }
 }

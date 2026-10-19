@@ -10,6 +10,7 @@ import { RentalsModule } from './rentals/rentals.module';
 import { UsersModule } from './users/users.module';
 import { ReviewsModule } from './reviews/reviews.module';
 import { CategoriesModule } from './categories/categories.module';
+import { AuthModule } from './auth/auth.module';
 
 export const { ObserveModule, ObserveInstrument } = createObserveModule();
 
@@ -19,6 +20,7 @@ export const { ObserveModule, ObserveInstrument } = createObserveModule();
       isGlobal: true,
       ttl: 60000,
     }),
+    AuthModule,
     CategoriesModule,
     ReviewsModule,
     PrismaModule,

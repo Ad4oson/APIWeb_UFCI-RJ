@@ -11,6 +11,8 @@ import {
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { UsersService } from './users.service';
+import { Query } from '@nestjs/common';
+import { ListGameReviewsDto } from '../reviews/dto/list-game-reviews.dto';
 
 @Controller('users')
 export class UsersController {
@@ -38,6 +40,23 @@ export class UsersController {
   @Get(':id/rentals')
   findRentals(@Param('id', ParseIntPipe) id: number) {
     return this.users.findRentals(id);
+  }
+
+  //Busca um usuário pelo review
+  @Get(':id/reviews')
+  findReviews(
+    @Param('id', ParseIntPipe) id: number,
+    @Query() query: ListGameReviewsDto,
+  ) {
+    return this.users.findReviews(id, query);
+  }
+
+  @Get(':id/reviews/stats')
+  findReviewStats(
+    @Param('id', ParseIntPipe) id: number,
+    @Query() query: ListGameReviewsDto,
+  ) {
+    return this.users.findReviewStats(id, query);
   }
 
   /** Busca um usuário pelo identificador. */
