@@ -75,6 +75,20 @@ export class UsersRepository {
     });
   }
 
+  async buscarCredenciaisPorEmail(email: string) {
+    return this.prisma.usuario.findUnique({
+      where: { email },
+      select: {
+        id: true,
+        nome: true,
+        email: true,
+        senha: true,
+        role: true,
+        ativo: true,
+      },
+    });
+  }
+
   async contarAlugueisAtivos(id: number) {
     return this.prisma.aluguel.count({
       where: {

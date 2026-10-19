@@ -12,6 +12,7 @@ import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateGameDto } from './dto/create-game.dto';
 import { UpdateGameDto } from './dto/update-game.dto';
+import { ListGameReviewsDto } from './dto/list-games-reviews.dto';
 
 @Injectable()
 export class GamesService {
@@ -122,6 +123,65 @@ export class GamesService {
       },
       orderBy: { data_aluguel: 'desc' },
     });
+  }
+
+  async findReviews(id: number, query: ListGameReviewsDto) {
+    await this.findOne(id);
+
+    const page = query.page ?? 1;
+    const limit = query.limit ?? 10;
+    const where: Prisma.AvaliacaoWhereInput = {
+      id_jogo: id,
+      ...(query.nota !== undefined && { nota: query.nota }),
+      ...(query.usuario && {
+        usuario: { nome: { contains: query.usuario } },
+      }),
+    };
+
+    const [data, total] = await this.prisma.$transaction([
+      this.prisma.avaliacao.findMany({
+        where,
+        include: {
+          usuario: { select: { id: true, nome: true } },
+        },
+        orderBy: { data_avaliacao: 'desc' },
+        skip: (page - 1) * limit,
+        take: limit,
+      }),
+      this.prisma.avaliacao.count({ where }),
+    ]);
+
+    return {
+      data,
+      meta: { page, limit, total, pages: Math.ceil(total / limit) },
+    };
+  }
+
+  async findReviewStats(id: number, query: ListGameReviewsDto) {
+    await this.findOne(id);
+
+    const where: Prisma.AvaliacaoWhereInput = {
+      id_jogo: id,
+      ...(query.nota !== undefined && { nota: query.nota }),
+      ...(query.usuario && {
+        usuario: { nome: { contains: query.usuario } },
+      }),
+    };
+
+    const stats = await this.prisma.avaliacao.aggregate({
+      where,
+      _avg: { nota: true },
+      _max: { nota: true },
+      _min: { nota: true },
+      _count: true,
+    });
+
+    return {
+      media: stats._avg.nota,
+      maiorNota: stats._max.nota,
+      menorNota: stats._min.nota,
+      totalAvaliacoes: stats._count,
+    };
   }
 
   async update(id: number, dto: UpdateGameDto) {

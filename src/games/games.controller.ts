@@ -15,6 +15,7 @@ import { CacheInterceptor } from '@nestjs/cache-manager';
 import { CreateGameDto } from './dto/create-game.dto';
 import { UpdateGameDto } from './dto/update-game.dto';
 import { GamesService } from './games.service';
+import { ListGameReviewsDto } from './dto/list-games-reviews.dto';
 import {
   ListGameCategoriesDto,
   ListGameRentalsDto,
@@ -77,13 +78,6 @@ export class GamesController {
   @ApiOperation({ summary: 'Reativa jogo' })
   activate(@Param('id', ParseIntPipe) id: number) {
     return this.games.activate(id);
-  }
-
-  /** Exclui um jogo que não possua histórico de aluguéis. */
-  @Delete(':id')
-  @ApiOperation({ summary: 'Deleta jogo' })
-  remove(@Param('id', ParseIntPipe) id: number) {
-    return this.games.remove(id);
   }
 
   //Busca um jogo pela categoria

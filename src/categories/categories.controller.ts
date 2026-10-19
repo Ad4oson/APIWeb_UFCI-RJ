@@ -16,8 +16,6 @@ import { CategoriesService } from './categories.service';
 import { CreateCategoryDto } from './dto/create-category.dto';
 import { LinkCategoryGameDto } from './dto/link-category-game.dto';
 import { UpdateCategoryDto } from './dto/update-category.dto';
-import { ListCategoriesDto } from './dto/list-categories.dto';
-import { ListCategoryGamesDto } from './dto/list-category-games.dto';
 
 @ApiTags('Categorias')
 @Controller('categories')
@@ -35,8 +33,8 @@ export class CategoriesController {
   @ApiResponse({ status: 200, description: 'Lista paginada de categorias' })
   @UseInterceptors(CacheInterceptor)
   @Get()
-  findAll(@Query() query: ListCategoriesDto) {
-    return this.categories.findAll(query);
+  findAll() {
+    return this.categories.findAll();
   }
 
   @Get(':id')
@@ -70,27 +68,27 @@ export class CategoriesController {
   }
 
   @ApiOperation({ summary: 'Lista os jogos de uma categoria' })
-  @ApiResponse({ status: 200, description: 'Lista paginada dos jogos associados à categoria' })
+  @ApiResponse({
+    status: 200,
+    description: 'Lista paginada dos jogos associados à categoria',
+  })
   @UseInterceptors(CacheInterceptor)
   @Get(':id/games')
-  findGames(
-    @Param('id', ParseIntPipe) id: number,
-    @Query() query: ListCategoryGamesDto,
-  ) {
-    return this.categories.findGames(id, query);
+  @Get(':id/games')
+  findGames(@Param('id', ParseIntPipe) id: number) {
+    return this.categories.findGames(id);
   }
 
   @ApiOperation({ summary: 'Lista apenas os jogos disponíveis da categoria' })
-  @ApiResponse({ status: 200, description: 'Lista paginada de jogos disponíveis' })
+  @ApiResponse({
+    status: 200,
+    description: 'Lista paginada de jogos disponíveis',
+  })
   @UseInterceptors(CacheInterceptor)
   @Get(':id/games/available')
-  findAvailableGames(
-    @Param('id', ParseIntPipe) id: number,
-    @Query() query: ListCategoryGamesDto,
-  ) {
-    return this.categories.findAvailableGames(id, query);
+  findAvailableGames(@Param('id', ParseIntPipe) id: number) {
+    return this.categories.findAvailableGames(id);
   }
-
   @Delete(':id')
   @ApiOperation({ summary: 'Remove categoria' })
   remove(@Param('id', ParseIntPipe) id: number) {

@@ -1,14 +1,14 @@
 import {
-    Body,
-    Controller,
-    Delete,
-    Get,
-    Param,
-    ParseIntPipe,
-    Patch,
-    Post,
-    Query,
-    UseInterceptors,
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  ParseIntPipe,
+  Patch,
+  Post,
+  Query,
+  UseInterceptors,
 } from '@nestjs/common';
 import { ApiBody, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { CacheInterceptor } from '@nestjs/cache-manager';
@@ -20,55 +20,44 @@ import { ReviewsService } from './reviews.service';
 @ApiTags('Avaliações')
 @Controller('reviews')
 export class ReviewsController {
-    constructor(
-        private readonly reviews: ReviewsService,
-    ) {}
+  constructor(private readonly reviews: ReviewsService) {}
 
-    @Post()
-    @ApiBody({ type: CreateReviewDto })
-    @ApiOperation({ summary: 'Criar avaliação' })
-    create(
-        @Body() dto: CreateReviewDto,
-    ) {
-        return this.reviews.create(dto);
-    }
+  @Post()
+  @ApiBody({ type: CreateReviewDto })
+  @ApiOperation({ summary: 'Criar avaliação' })
+  create(@Body() dto: CreateReviewDto) {
+    return this.reviews.create(dto);
+  }
 
-    @ApiOperation({
-        summary: 'Listar avaliações',
-    })
-    @ApiResponse({
-        status: 200,
-        description: 'Lista paginada de avaliações',
-    })
-    @UseInterceptors(CacheInterceptor)
-    @Get()
-    findAll(@Query() query: ListReviewsDto) {
-        return this.reviews.findAll(query);
-    }
+  @ApiOperation({
+    summary: 'Listar avaliações',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Lista paginada de avaliações',
+  })
+  @UseInterceptors(CacheInterceptor)
+  @Get()
+  findAll(@Query() query: ListReviewsDto) {
+    return this.reviews.findAll(query);
+  }
 
-    @Get(':id')
-    @ApiOperation({ summary: 'Busca avaliação pelo id' })
-    findOne(
-        @Param('id', ParseIntPipe) id: number,
-    ) {
-        return this.reviews.findOne(id);
-    }
+  @Get(':id')
+  @ApiOperation({ summary: 'Busca avaliação pelo id' })
+  findOne(@Param('id', ParseIntPipe) id: number) {
+    return this.reviews.findOne(id);
+  }
 
-    @Patch(':id')
-    @ApiBody({ type: UpdateReviewDto })
-    @ApiOperation({ summary: 'Atualizar notas e comentários da avaliação' })
-    update(
-        @Param('id', ParseIntPipe) id: number,
-        @Body() dto: UpdateReviewDto,
-    ) {
-        return this.reviews.update(id, dto);
-    }
+  @Patch(':id')
+  @ApiBody({ type: UpdateReviewDto })
+  @ApiOperation({ summary: 'Atualizar notas e comentários da avaliação' })
+  update(@Param('id', ParseIntPipe) id: number, @Body() dto: UpdateReviewDto) {
+    return this.reviews.update(id, dto);
+  }
 
-    @Delete(':id')
-    @ApiOperation({ summary: 'Deletar avaliação' })
-    remove(
-        @Param('id', ParseIntPipe) id: number,
-    ) {
-        return this.reviews.remove(id);
-    }
+  @Delete(':id')
+  @ApiOperation({ summary: 'Deletar avaliação' })
+  remove(@Param('id', ParseIntPipe) id: number) {
+    return this.reviews.remove(id);
+  }
 }
