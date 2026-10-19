@@ -8,9 +8,6 @@ import { randomBytes, scryptSync } from 'node:crypto';
 import { UsersRepository } from './users.repository';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
-import { PrismaService } from '../prisma/prisma.service';
-import { ListGameReviewsDto } from '../reviews/dto/list-game-reviews.dto';
-
 import { Prisma } from '@prisma/client';
 
 function gerarHashSenha(senha: string): string {
@@ -21,10 +18,7 @@ function gerarHashSenha(senha: string): string {
 
 @Injectable()
 export class UsersService {
-  constructor(
-    private readonly repository: UsersRepository,
-    private readonly prisma: PrismaService
-  ) {}
+  constructor(private readonly repository: UsersRepository) {}
 
   async create(dto: CreateUserDto) {
     const jaExiste = await this.repository.buscarPorEmail(dto.email);
@@ -67,76 +61,6 @@ export class UsersService {
   async findRentals(id: number) {
     await this.findOne(id); // valida se o usuário existe primeiro
     return this.repository.buscarAlugueisDoUsuario(id);
-  }
-
-  async findReviews(
-    id: number,
-    query: ListGameReviewsDto
-  ) {
-    await this.findOne(id);
-
-    const page = query.page ?? 1;
-    const limit = query.limit ?? 10;
-
-    const where: any = {
-      id_usuario: id,
-    };
-
-    if(query.nota){
-      where.nota = query.nota;
-    }
-
-    const [data, total] = await Promise.all([
-      this.prisma.avaliacao.findMany({
-        where,
-        include: {
-          jogo: true,
-        },
-        skip: (page - 1) * limit,
-        take: limit,
-      }),
-      this.prisma.avaliacao.count({
-        where,
-      }),
-    ]);
-
-    return {
-      data,
-      meta: {
-        page,
-        limit,
-        total,
-        pages: Math.ceil(total / limit),
-      },
-    };
-  }
-
-  async findReviewStats(
-    id: number,
-    query: ListGameReviewsDto
-  ) {
-    await this.findOne(id);
-
-    const where: any = {
-      id_usuario: id,
-    };
-
-    if(query.nota) {
-      where.nota = query.nota;
-    }
-
-    const stats = await this.prisma.avaliacao.aggregate({
-      where,
-      _avg: {
-        nota: true,
-      },
-      _count: true,
-    });
-
-    return {
-      media: stats._avg.nota,
-      totalAvaliacoes: stats._count,
-    };
   }
 
   async update(id: number, dto: UpdateUserDto) {

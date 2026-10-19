@@ -23,20 +23,6 @@ export class UsersRepository {
     });
   }
 
-  async buscarCredenciaisPorEmail(email: string) {
-    return this.prisma.usuario.findUnique({
-      where: {email},
-      select: {
-        id: true,
-        nome: true,
-        email: true,
-        senha: true,
-        role: true,
-        ativo: true,
-      },
-    });
-  }
-
   async criar(data: any) {
     return this.prisma.usuario.create({
       data,
