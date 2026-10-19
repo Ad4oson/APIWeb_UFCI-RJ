@@ -13,8 +13,6 @@ import { ApiBody, ApiOperation, ApiParam, ApiTags } from '@nestjs/swagger';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { UsersService } from './users.service';
-import { Query } from '@nestjs/common';
-import { ListGameReviewsDto } from '../reviews/dto/list-game-reviews.dto';
 import { CacheInterceptor } from '@nestjs/cache-manager';
 
 @ApiTags('Usuários')
@@ -54,23 +52,6 @@ export class UsersController {
   @ApiOperation({ summary: 'Aluguéis associados ao usuário' })
   findRentals(@Param('id', ParseIntPipe) id: number) {
     return this.users.findRentals(id);
-  }
-
-  //Busca um usuário pelo review
-  @Get(':id/reviews')
-  findReviews(
-    @Param('id', ParseIntPipe) id: number,
-    @Query() query: ListGameReviewsDto,
-  ) {
-    return this.users.findReviews(id, query);
-  }
-
-  @Get(':id/reviews/stats')
-  findReviewStats(
-    @Param('id', ParseIntPipe) id: number,
-    @Query() query: ListGameReviewsDto,
-  ) {
-    return this.users.findReviewStats(id, query);
   }
 
   /** Busca um usuário pelo identificador. */
