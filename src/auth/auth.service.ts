@@ -2,15 +2,15 @@ import {
     Injectable,
     UnauthorizedException
  } from '@nestjs/common';
- import { JwtService } from '@nestjs/jwt';
- import { scryptSync } from 'node:crypto';
- import { UsersRepository } from '../users/users.repository';
- import { LoginDto } from './dto/login.dto';
+import { JwtService } from '@nestjs/jwt';
+import { scryptSync } from 'node:crypto';
+import { UsersRepository } from '../users/users.repository';
+import { LoginDto } from './dto/login.dto';
 
- function validarSenha(
+function validarSenha(
     senhaDigitada: string,
     hashSalvo: string,
- ): boolean {
+): boolean {
     const [salt, hash] = hashSalvo.split(':');
 
     const hashTeste = scryptSync(
@@ -19,25 +19,24 @@ import {
         64,
     ).toString('hex');
 
-    return hashTeste === 'hash';
- }
+    return hashTeste === hash;
+}
 
- @Injectable()
- export class AuthService {
+@Injectable()
+export class AuthService {
     constructor(
         private readonly usersRepository: UsersRepository,
         private readonly jwtService: JwtService,
     ) {}
 
-    //Realiza a autenticação do usuário e retorna um JSWT válido
-    async login(dto :LoginDto) {
+    async login(dto: LoginDto) {
         const usuario = await this.usersRepository.buscarCredenciaisPorEmail(dto.email);
 
-        if(!usuario) {
+        if (!usuario) {
             throw new UnauthorizedException('Usuário ou senha inválidos');
         }
 
-        if(!usuario.ativo) {
+        if (!usuario.ativo) {
             throw new UnauthorizedException('Usuário desativado');
         }
 
@@ -46,8 +45,8 @@ import {
             usuario.senha,
         );
 
-        if(!senhaValida) {
-            throw new UnauthorizedException('E-mail ou senha inválidos')
+        if (!senhaValida) {
+            throw new UnauthorizedException('E-mail ou senha inválidos');
         }
 
         const payload = {
@@ -58,7 +57,6 @@ import {
 
         return {
             access_token: await this.jwtService.signAsync(payload),
-
             usuario: {
                 id: usuario.id,
                 nome: usuario.nome,
@@ -68,21 +66,19 @@ import {
         };
     } 
 
-    //Retorna os dados do usuário logado
     async me(userId: number) {
         const usuario = await this.usersRepository.buscarPorId(userId);
 
-        if(!usuario) {
+        if (!usuario) {
             throw new UnauthorizedException('Usuário não encontrado');
         }
         return usuario;
     }
 
-    //Valida o token atual
     async validate(userId: number) {
         const usuario = await this.usersRepository.buscarPorId(userId);
 
-        if(!usuario) {
+        if (!usuario) {
             throw new UnauthorizedException('Usuário não encontrado');
         }
 
@@ -91,4 +87,4 @@ import {
             usuario,
         };
     }
- }
+}
