@@ -8,12 +8,14 @@ import {
   Patch,
   Post,
   UseInterceptors,
+  Query,
 } from '@nestjs/common';
 import { ApiBody, ApiOperation, ApiParam, ApiTags } from '@nestjs/swagger';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { UsersService } from './users.service';
 import { CacheInterceptor } from '@nestjs/cache-manager';
+import { ListUsersDto } from './dto/list-user.dto';
 
 @ApiTags('Usuários')
 @Controller('users')
@@ -32,17 +34,19 @@ export class UsersController {
   /** Lista os usuários sem expor suas senhas. */
   @Get()
   @UseInterceptors(CacheInterceptor)
-  @ApiOperation({ summary: 'Listar usuários' })
-  findAll() {
-    return this.users.findAll();
+  @ApiOperation({ summary: 'Listar usuários com paginação e filtros' })
+  findAll(@Query() query: ListUsersDto) {
+    return this.users.findAll(query);
   }
 
   /** Lista somente usuários ativos. */
   @Get('active')
   @UseInterceptors(CacheInterceptor)
-  @ApiOperation({ summary: 'Listar usuários ativos' })
-  findActive() {
-    return this.users.findActive();
+  @ApiOperation({
+    summary: 'Listar usuários ativos com paginação e filtro por nome',
+  })
+  findActive(@Query() query: ListUsersDto) {
+    return this.users.findActive(query);
   }
 
   /** Retorna os aluguéis associados ao usuário. */

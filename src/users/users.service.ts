@@ -9,6 +9,7 @@ import { UsersRepository } from './users.repository';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { Prisma } from '@prisma/client';
+import { ListUsersDto } from './dto/list-user.dto';
 
 function gerarHashSenha(senha: string): string {
   const salt = randomBytes(16).toString('hex');
@@ -42,12 +43,12 @@ export class UsersService {
     return this.repository.criar(dadosNovoUsuario);
   }
 
-  findAll() {
-    return this.repository.buscarTodos();
+  findAll(query: ListUsersDto) {
+    return this.repository.buscarPaginado(query);
   }
 
-  findActive() {
-    return this.repository.buscarAtivos();
+  findActive(query: ListUsersDto) {
+    return this.repository.buscarPaginado(query, true);
   }
 
   async findOne(id: number) {
