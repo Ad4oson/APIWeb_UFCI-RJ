@@ -25,7 +25,7 @@ enum FormaPagamento {
 
 enum StatusPagamento {
   PENDENTE
-  PAGO
+  CONFIRMADO
   CANCELADO
   ESTORNADO
 }
