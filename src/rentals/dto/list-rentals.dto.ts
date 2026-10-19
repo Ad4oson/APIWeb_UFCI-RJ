@@ -1,13 +1,15 @@
+import { ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import { StatusAluguel } from '@prisma/client';
 import { IsEnum, IsInt, IsOptional, Min } from 'class-validator';
-import { ApiPropertyOptional } from '@nestjs/swagger';
 
 export class ListRentalsDto {
-  @ApiPropertyOptional({ 
-    example: 1, 
-    description: 'Página dos resultados',
-    type: Number
+  @ApiPropertyOptional({
+    description: 'Número da página dos resultados',
+    example: 1,
+    default: 1,
+    minimum: 1,
+    type: Number,
   })
   @Type(() => Number)
   @IsOptional()
@@ -15,10 +17,12 @@ export class ListRentalsDto {
   @Min(1)
   page = 1;
 
-  @ApiPropertyOptional({ 
-    example: 20, 
-    description: 'Itens por página',
-    type: Number
+  @ApiPropertyOptional({
+    description: 'Quantidade máxima de resultados por página',
+    example: 20,
+    default: 20,
+    minimum: 1,
+    type: Number,
   })
   @Type(() => Number)
   @IsOptional()
@@ -27,9 +31,9 @@ export class ListRentalsDto {
   limit = 20;
 
   @ApiPropertyOptional({
-    example: 'ATIVO',
-    description: 'Filtrar pelo status do aluguel',
-    enum: StatusAluguel
+    description: 'Filtra os aluguéis pelo status',
+    example: StatusAluguel.ATIVO,
+    enum: StatusAluguel,
   })
   @IsOptional()
   @IsEnum(StatusAluguel)

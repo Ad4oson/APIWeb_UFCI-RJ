@@ -8,6 +8,7 @@ import { randomBytes, scryptSync } from 'node:crypto';
 import { UsersRepository } from './users.repository';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
+import { Prisma } from '@prisma/client';
 
 function gerarHashSenha(senha: string): string {
   const salt = randomBytes(16).toString('hex');
@@ -25,11 +26,17 @@ export class UsersService {
       throw new ConflictException('Este e-mail já está cadastrado.');
     }
 
+    const cpfExistente = await this.repository.buscarPorCpf(dto.cpf);
+    if (cpfExistente) {
+      throw new ConflictException('Este CPF já está cadastrado.');
+    }
+
     const dadosNovoUsuario = {
       nome: dto.nome,
       email: dto.email,
       senha: gerarHashSenha(dto.senha),
       telefone: dto.telefone,
+      cpf: dto.cpf,
     };
 
     return this.repository.criar(dadosNovoUsuario);
@@ -64,6 +71,14 @@ export class UsersService {
       const checkEmail = await this.repository.buscarPorEmail(dto.email);
       if (checkEmail && checkEmail.id !== id) {
         throw new ConflictException('Este e-mail já está cadastrado.');
+      }
+    }
+
+    if (dto.cpf !== undefined) {
+      const cpfExistente = await this.repository.buscarPorCpf(dto.cpf);
+
+      if (cpfExistente && cpfExistente.id !== id) {
+        throw new ConflictException('Este CPF já está cadastrado.');
       }
     }
 

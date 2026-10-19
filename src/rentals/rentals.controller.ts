@@ -12,7 +12,13 @@ import {
   UseInterceptors,
 } from '@nestjs/common';
 import { CacheInterceptor } from '@nestjs/cache-manager';
-import { ApiBody, ApiOperation, ApiParam, ApiResponse, ApiTags } from '@nestjs/swagger';
+import {
+  ApiBody,
+  ApiOperation,
+  ApiParam,
+  ApiResponse,
+  ApiTags,
+} from '@nestjs/swagger';
 import { AdminGuard } from '../common/guards/admin.guard';
 import { CreateRentalDto } from './dto/create-rental.dto';
 import { ExtendRentalDto } from './dto/extend-rental.dto';
@@ -26,14 +32,20 @@ export class RentalsController {
 
   @ApiOperation({ summary: 'Criar um novo aluguel' })
   @ApiBody({ type: CreateRentalDto })
-  @ApiResponse({ status: 201, description: 'Aluguel registrado e estoque do jogo atualizado.' })
+  @ApiResponse({
+    status: 201,
+    description: 'Aluguel registrado e estoque do jogo atualizado.',
+  })
   @Post()
   create(@Body() dto: CreateRentalDto) {
     return this.rentals.create(dto);
   }
 
   @ApiOperation({ summary: 'Listar todos os aluguéis' })
-  @ApiResponse({ status: 200, description: 'Lista paginada com os aluguéis do sistema.' })
+  @ApiResponse({
+    status: 200,
+    description: 'Lista paginada com os aluguéis do sistema.',
+  })
   @UseInterceptors(CacheInterceptor)
   @Get()
   findAll(@Query() query: ListRentalsDto) {
@@ -41,6 +53,7 @@ export class RentalsController {
   }
 
   @ApiOperation({ summary: 'Listar apenas aluguéis ativos' })
+  @UseInterceptors(CacheInterceptor)
   @Get('active')
   findActive() {
     return this.rentals.findActive();
@@ -54,7 +67,10 @@ export class RentalsController {
 
   @ApiOperation({ summary: 'Ver histórico de um usuário específico' })
   @ApiParam({ name: 'userId', description: 'ID do usuário', type: Number })
-  @ApiResponse({ status: 200, description: 'Histórico completo de locações do usuário.' })
+  @ApiResponse({
+    status: 200,
+    description: 'Histórico completo de locações do usuário.',
+  })
   @Get('user/:userId')
   findByUser(@Param('userId', ParseIntPipe) userId: number) {
     return this.rentals.findByUser(userId);
@@ -78,7 +94,10 @@ export class RentalsController {
 
   @ApiOperation({ summary: 'Cancelar um aluguel em andamento' })
   @ApiParam({ name: 'id', description: 'ID do aluguel', type: Number })
-  @ApiResponse({ status: 200, description: 'Aluguel cancelado e jogo devolvido ao estoque.' })
+  @ApiResponse({
+    status: 200,
+    description: 'Aluguel cancelado e jogo devolvido ao estoque.',
+  })
   @Patch(':id/cancel')
   cancel(@Param('id', ParseIntPipe) id: number) {
     return this.rentals.cancel(id);
@@ -95,7 +114,10 @@ export class RentalsController {
 
   @ApiOperation({ summary: 'Apagar registro de aluguel do banco' })
   @ApiParam({ name: 'id', description: 'ID do aluguel', type: Number })
-  @ApiResponse({ status: 200, description: 'Registro apagado permanentemente.' })
+  @ApiResponse({
+    status: 200,
+    description: 'Registro apagado permanentemente.',
+  })
   @Delete(':id')
   @UseGuards(AdminGuard)
   remove(@Param('id', ParseIntPipe) id: number) {
