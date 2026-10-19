@@ -10,21 +10,21 @@ function gerarHashSenha(senha: string): string {
 }
 
 async function main() {
-  const senha = gerarHashSenha('123456');
+  const senha = gerarHashSenha('123456789');
 
   await prisma.usuario.upsert({
-    where: { email: 'admin@ufcirj.com' },
+    where: { email: 'carlos@email.com' },
     update: {
-      nome: 'Administrador',
+      nome: 'Usuário',
       senha,
-      role: 'ADMIN',
+      role: 'USER',
       ativo: true,
     },
     create: {
-      nome: 'Administrador',
-      email: 'admin@ufcirj.com',
+      nome: 'Usuário',
+      email: 'carlos@email.com',
       senha,
-      role: 'ADMIN',
+      role: 'USER',
     },
   });
 
