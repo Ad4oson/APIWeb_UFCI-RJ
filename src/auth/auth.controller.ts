@@ -19,7 +19,7 @@ import {
  @ApiTags('Autenticação')
  @Controller('auth')
  export class AuhtController {
-    constructor(private readonly authService: AuhtService) {}
+    constructor(private readonly authService: AuthService) {}
 
     @ApiOperation({
         summary: 'Realizar login'
