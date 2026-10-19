@@ -4,7 +4,6 @@ import {
   NotFoundException,
   BadRequestException,
 } from '@nestjs/common';
-
 import { StatusAluguel } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateReviewDto } from './dto/create-review.dto';
@@ -15,58 +14,59 @@ import { ListReviewsDto } from './dto/list-reviews.dto';
 export class ReviewsService {
   constructor(private readonly prisma: PrismaService) {}
 
-    async findAll(query: ListReviewsDto) {
-        const page = query.page ?? 1;
-        const limit = query.limit ?? 10;
+  async findAll(query: ListReviewsDto) {
+    const page = query.page ?? 1;
+    const limit = query.limit ?? 10;
 
-        const where: any = {};
+    const where: any = {};
 
-        if(query.id_jogo) {
-            where.id_jogo = query.id_jogo;
-        }
+    if (query.id_jogo) {
+      where.id_jogo = query.id_jogo;
+    }
 
-        if(query.nota){
-            where.nota = query.nota;
-        }
+    if (query.nota) {
+      where.nota = query.nota;
+    }
 
-        const [data, total] = await Promise.all([
-            this.prisma.avaliacao.findMany({
-                where,
-                include: {
-                    usuario: {
-                        select: {
-                            id: true,
-                            nome: true,
-                        },
-                    },
-                jogo: {
-                    select: {
-                        id: true,
-                        nome: true,
-                    },
-                },
+    const [data, total] = await Promise.all([
+      this.prisma.avaliacao.findMany({
+        where,
+        include: {
+          usuario: {
+            select: {
+              id: true,
+              nome: true,
             },
-            orderBy: {
-                data_avaliacao: 'desc',
+          },
+          jogo: {
+            select: {
+              id: true,
+              nome: true,
             },
-            skip: (page - 1) * limit,
-            take: limit,
-            }),
+          },
+        },
+        orderBy: {
+          data_avaliacao: 'desc',
+        },
+        skip: (page - 1) * limit,
+        take: limit,
+      }),
+      this.prisma.avaliacao.count({
+        where,
+      }),
+    ]);
 
-            this.prisma.avaliacao.count({
-                where,
-            }),
-        ]);
+    return {
+      data,
+      meta: {
+        page,
+        limit,
+        total,
+        pages: Math.ceil(total / limit),
+      },
+    };
+  }
 
-        return {
-            data,
-            meta: {
-                page,
-                limit,
-                total,
-                pages: Math.ceil(total / limit),
-            },
-        };
   async create(dto: CreateReviewDto) {
     const usuario = await this.prisma.usuario.findUnique({
       where: {
@@ -123,28 +123,6 @@ export class ReviewsService {
       include: {
         usuario: true,
         jogo: true,
-      },
-    });
-  }
-
-  findAll() {
-    return this.prisma.avaliacao.findMany({
-      include: {
-        usuario: {
-          select: {
-            id: true,
-            nome: true,
-          },
-        },
-        jogo: {
-          select: {
-            id: true,
-            nome: true,
-          },
-        },
-      },
-      orderBy: {
-        data_avaliacao: 'desc',
       },
     });
   }
