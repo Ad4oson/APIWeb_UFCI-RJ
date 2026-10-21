@@ -75,8 +75,19 @@ export class CategoriesService {
     }
 
     async unlikGame(dto: LinkCategoryGameDto) {
-        // removendo a relacao
-        return this.repository.deslinkarJogo(dto.id_categoria, dto.id_jogo);
+        const relacao = await this.repository.buscarRelacao(
+            dto.id_categoria,
+            dto.id_jogo,
+        );
+
+        if(!relacao) {
+            throw new NotFoundException('Relação não encontrada');
+        }
+
+        return this.repository.deslinkarJogo(
+            dto.id_categoria,
+            dto.id_jogo
+        );
     }
 
     async findGames(id: number, query: ListCategoryGamesDto) {

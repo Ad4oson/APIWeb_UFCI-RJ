@@ -19,7 +19,7 @@ import {
         64,
     ).toString('hex');
 
-    return hashTeste === 'hash';
+    return hashTeste === hash;
  }
 
  @Injectable()
@@ -29,7 +29,6 @@ import {
         private readonly jwtService: JwtService,
     ) {}
 
-    //Realiza a autenticação do usuário e retorna um JSWT válido
     async login(dto :LoginDto) {
         const usuario = await this.usersRepository.buscarCredenciaisPorEmail(dto.email);
 
@@ -68,7 +67,6 @@ import {
         };
     } 
 
-    //Retorna os dados do usuário logado
     async me(userId: number) {
         const usuario = await this.usersRepository.buscarPorId(userId);
 
@@ -78,7 +76,6 @@ import {
         return usuario;
     }
 
-    //Valida o token atual
     async validate(userId: number) {
         const usuario = await this.usersRepository.buscarPorId(userId);
 

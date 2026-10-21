@@ -11,9 +11,8 @@ import {
 import { CreateReviewDto } from './dto/create-review.dto';
 import { UpdateReviewDto } from './dto/update-review.dto';
 import { ReviewsService } from './reviews.service';
-import { ParamsTokenFactory } from '@nestjs/core/internal';
 import { Query } from '@nestjs/common'
-import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
+import { ApiOperation, ApiParam, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { ListReviewsDto } from './dto/list-reviews.dto'; 
 
 @ApiTags('Avaliações')
@@ -24,6 +23,17 @@ export class ReviewsController {
     ) {}
 
     //Cria uma avaliação para um jogo
+    @ApiOperation({
+        summary: 'Criar uma avaliação',
+    })
+    @ApiResponse({
+        status: 201,
+        description: 'Avaliação criada com sucesso',
+    })
+    @ApiResponse({
+        status: 404,
+        description: 'Usuário ou jogo não encontrado',
+    })
     @Post()
     create(
         @Body() dto: CreateReviewDto,
@@ -44,6 +54,22 @@ export class ReviewsController {
     }
 
     //Busca uma avaliação pelo identificador
+    @ApiOperation({
+        summary: 'Buscar avaliação por ID',
+    })
+    @ApiParam({
+        name: 'id',
+        description: 'ID da avaliação',
+        type: Number,
+    })
+    @ApiResponse({
+        status: 200,
+        description: 'Avaliação Encontrada',
+    })
+    @ApiResponse({
+        status: 404,
+        description: 'Avaliação não encontrada',
+    })
     @Get(':id')
     findOne(
         @Param('id', ParseIntPipe) id: number,
@@ -52,6 +78,22 @@ export class ReviewsController {
     }
 
     //Atualiza notas e comentários da avaliação
+    @ApiOperation({
+        summary: 'Atualizar avaliação',
+    })
+    @ApiParam({
+        name: 'id',
+        description: 'ID da avaliação',
+        type: Number,
+    })
+    @ApiResponse({
+        status: 200,
+        description: 'Avaliação atualizada com sucesso',
+    })
+    @ApiResponse({
+        status: 404,
+        description: 'Avaliação não encontrada',
+    })
     @Patch(':id')
     update(
         @Param('id', ParseIntPipe) id: number,
@@ -61,6 +103,22 @@ export class ReviewsController {
     }
 
     //Remove uma avaliação já feita
+    @ApiOperation({
+        summary: 'Excluir avaliação',
+    })
+    @ApiParam({
+        name: 'id',
+        description: 'ID da avaliação',
+        type: Number,
+    })
+    @ApiResponse({
+        status: 200,
+        description: 'Avaliação removida com sucesso',
+    })
+    @ApiResponse({
+        status: 404,
+        description: 'Avaliação não encontrada',
+    })
     @Delete(':id')
     remove(
         @Param('id', ParseIntPipe) id: number,

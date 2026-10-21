@@ -15,6 +15,9 @@ import { AdminGuard } from '../common/guards/admin.guard';
 import { CreatePaymentDto } from './dto/create-payment.dto';
 import { ListPaymentsDto } from './dto/list-payments.dto';
 import { PaymentsService } from './payments.service';
+import { Roles } from '../auth/decorators/roles.decorator';
+import { RolesGuard } from '../auth/guards/roles.guard';
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 
 @ApiTags('Pagamentos')
 @Controller('payments')
@@ -91,7 +94,11 @@ export class PaymentsController {
   @ApiParam({ name: 'id', description: 'ID numérico do pagamento', type: Number })
   @ApiResponse({ status: 200, description: 'Registro apagado permanentemente.' })
   @Delete(':id')
-  @UseGuards(AdminGuard)
+  @UseGuards(
+    JwtAuthGuard,
+    RolesGuard,
+  )
+  @Roles('ADMIN')
   remove(@Param('id', ParseIntPipe) id: number) {
     return this.payments.remove(id);
   }

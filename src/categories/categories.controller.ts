@@ -13,7 +13,7 @@ import { CreateCategoryDto } from './dto/create-category.dto';
 import { LinkCategoryGameDto } from './dto/link-category-game.dto';
 import { UpdateCategoryDto } from './dto/update-category.dto';
 import { Query } from '@nestjs/common';
-import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
+import { ApiOperation, ApiParam, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { ListCategoriesDto } from './dto/list-categories.dto';
 import { ListCategoryGamesDto } from './dto/list-category-games.dto';
 
@@ -48,6 +48,11 @@ export class CategoriesController {
     }
 
     //Busca uma categoria pelo identificador
+    @ApiParam({
+        name: 'id',
+        description: 'ID da categoria',
+        type: Number,
+    })
     @Get(':id')
     findOne(
         @Param('id', ParseIntPipe) id: number,
@@ -56,11 +61,15 @@ export class CategoriesController {
     }
 
     //Atualiza os dados da categoria
+    @ApiParam({
+        name: 'id',
+        description: 'ID da categoria',
+        type: Number,
+    })
     @Patch(':id')
     update(
         @Param('id', ParseIntPipe) id: number,
-        @Body()
-        dto: UpdateCategoryDto,
+        @Body() dto: UpdateCategoryDto,
     ) {
         return this.categories.update(id, dto);
     }
@@ -74,6 +83,7 @@ export class CategoriesController {
         return this.categories.linkGame(dto);
     }
 
+    
     //Remove a associação entre categoria e jogos
     @Delete('games')
     unlikGame(
@@ -84,6 +94,11 @@ export class CategoriesController {
     }
 
     //Lista jogos pertencentes a uma categoria
+    @ApiParam({
+        name: 'id',
+        description: 'ID da categoria',
+        type: Number,
+    })
     @ApiOperation({
         summary: 'Lista os jogos de uma categoria',
     })
@@ -100,6 +115,11 @@ export class CategoriesController {
     }
 
     //Lista apenas jogos disponivéis da categoria específica
+    @ApiParam({
+        name: 'id',
+        description: 'ID da categoria',
+        type: Number,
+    })
     @ApiOperation({
         summary: 'Lista apenas os jogos disponíveis da categoria',
     })
@@ -116,11 +136,15 @@ export class CategoriesController {
     }
 
     //Remove uma categoria
+    @ApiParam({
+        name: 'id',
+        description: 'ID da categoria',
+        type: Number,
+    })
     @Delete(':id')
     remove(
         @Param('id', ParseIntPipe) id: number,
     ) {
         return this.categories.remove(id);
     }
-
 }

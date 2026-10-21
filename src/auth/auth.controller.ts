@@ -18,7 +18,7 @@ import {
 
  @ApiTags('Autenticação')
  @Controller('auth')
- export class AuhtController {
+ export class AuthController {
     constructor(private readonly authService: AuthService) {}
 
     @ApiOperation({
@@ -40,6 +40,14 @@ import {
     @ApiOperation({
         summary: 'Retorna dados do usuário autenticado'
     })
+    @ApiResponse({
+        status: 200,
+        description: 'Usuário autenticado',
+    })
+    @ApiResponse({
+        status: 401,
+        description: 'Não autorizado',
+    })
     @UseGuards(JwtAuthGuard)
     @Get('me')
     me(@Req() req: any) {
@@ -49,6 +57,14 @@ import {
     @ApiBearerAuth()
     @ApiOperation({
         summary: 'Valida o token JWT'
+    })
+    @ApiResponse({
+        status: 200,
+        description: 'Token inválido',
+    })
+    @ApiResponse({
+        status: 401,
+        description: 'Não autorizado',
     })
     @UseGuards(JwtAuthGuard)
     @Get('validate')

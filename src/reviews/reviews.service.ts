@@ -3,139 +3,48 @@ import {
     Injectable,
     NotFoundException,
  } from '@nestjs/common';
-
-import { PrismaService } from '../prisma/prisma.service';
 import { CreateReviewDto } from './dto/create-review.dto';
 import { UpdateReviewDto } from './dto/update-review.dto';
 import { ListReviewsDto } from './dto/list-reviews.dto';
+import { ReviewsRepository } from './reviews.repository';
 
 @Injectable()
 export class ReviewsService {
     constructor(
-        private readonly prisma: PrismaService,
+        private readonly repository: ReviewsRepository,
     ) {}
 
     async create(dto: CreateReviewDto) {
-        const usuario = await this.prisma.usuario.findUnique({
-            where: {
-                id: dto.id_usuario,
-            },
-        });
+        const usuario = await this.repository.buscarUsuario(dto.id_usuario);
 
         if(!usuario) {
             throw new NotFoundException('Usuário não encontrado');
         }
 
-        const jogo = await this.prisma.jogo.findUnique({
-            where: {
-                id: dto.id_jogo,
-            },
-        });
+        const jogo = await this.repository.buscarJogo(dto.id_jogo);
 
         if(!jogo) {
-            throw new NotFoundException('jogo não encontrado');
+            throw new NotFoundException('Jogo não encontrado');
         }
 
-        const avaliacaoExistente = await this.prisma.avaliacao.findFirst({
-            where: {
-                id_usuario: dto.id_usuario,
-                id_jogo: dto.id_jogo,
-            },
-        });
+        const avaliacaoExistente = await this.repository.buscarAvaliacaoUsuarioJogo(dto.id_usuario, dto.id_jogo);
 
         if(avaliacaoExistente) {
             throw new ConflictException('Este usuário já avaliou esse jogo');
         }
 
-        return this.prisma.avaliacao.create({
-            data: {
-                id_usuario: dto.id_usuario,
-                id_jogo: dto.id_jogo,
-                nota: dto.nota,
-                comentario: dto.comentario,
-            }, include: {
-                usuario: true,
-                jogo: true,
-            },
-        });
+       return this.repository.criar(dto);
     }
 
     async findAll(query: ListReviewsDto) {
-        const page = query.page ?? 1;
-        const limit = query.limit ?? 10;
-
-        const where: any = {};
-
-        if(query.id_jogo) {
-            where.id_jogo = query.id_jogo;
-        }
-
-        if(query.nota){
-            where.nota = query.nota;
-        }
-
-        const [data, total] = await Promise.all([
-            this.prisma.avaliacao.findMany({
-                where,
-                include: {
-                    usuario: {
-                        select: {
-                            id: true,
-                            nome: true,
-                        },
-                    },
-                jogo: {
-                    select: {
-                        id: true,
-                        nome: true,
-                    },
-                },
-            },
-            orderBy: {
-                data_avaliacao: 'desc',
-            },
-            skip: (page - 1) * limit,
-            take: limit,
-            }),
-
-            this.prisma.avaliacao.count({
-                where,
-            }),
-        ]);
-
-        return {
-            data,
-            meta: {
-                page,
-                limit,
-                total,
-                pages: Math.ceil(total / limit),
-            },
-        };
+        return this.repository.listar(query);
     }
 
     async findOne(id: number) {
-        const avaliacao = await this.prisma.avaliacao.findUnique({
-            where: { id },
-            include: {
-                usuario: {
-                    select: {
-                        id: true,
-                        nome: true,
-                        email: true,
-                    },
-                },
-                jogo: {
-                    select: {
-                        id: true,
-                        nome: true,
-                    },
-                },
-            },
-        });
+        const avaliacao = await this.repository.buscarPorId(id);
 
         if(!avaliacao) {
-            throw new NotFoundException('avaliação não encontrada');
+            throw new NotFoundException('Avaliação não encontrada');
         }
 
         return avaliacao;
@@ -144,25 +53,12 @@ export class ReviewsService {
     async update(id: number, dto: UpdateReviewDto) {
         await this.findOne(id);
 
-        return this.prisma.avaliacao.update({
-            where: { id, },
-            data: {
-                ...(dto.nota !== undefined && {nota: dto.nota,
-                }),
-                ...(dto.comentario !== undefined && {comentario: dto. comentario,}),
-            },
-            include: {
-                usuario: true,
-                jogo: true,
-            },
-        });
+        return this.repository.atualizar(id, dto);
     }
 
     async remove(id: number) {
         await this.findOne(id);
 
-        return this.prisma.avaliacao.delete({
-            where: { id, },
-        });
+       return this.repository.deletar(id);
     }
 }
