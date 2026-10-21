@@ -16,6 +16,7 @@ export class ListPaymentsDto {
     example: 1,
     default: 1,
     minimum: 1,
+    type: Number,
   })
   @Type(() => Number)
   @IsOptional()
@@ -29,6 +30,7 @@ export class ListPaymentsDto {
     default: 20,
     minimum: 1,
     maximum: 100,
+    type: Number,
   })
   @Type(() => Number)
   @IsOptional()
@@ -56,7 +58,7 @@ export class ListPaymentsDto {
   forma_pagamento?: FormaPagamento;
 
   @ApiPropertyOptional({
-    description: 'Data inicial do filtro, em formato ISO',
+    description: 'Data inicial:',
     example: '2026-10-01',
   })
   @IsOptional()
@@ -64,7 +66,7 @@ export class ListPaymentsDto {
   startDate?: string;
 
   @ApiPropertyOptional({
-    description: 'Data final do filtro, em formato ISO',
+    description: 'Data final:',
     example: '2026-10-31',
   })
   @IsOptional()
