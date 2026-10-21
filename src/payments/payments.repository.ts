@@ -1,12 +1,8 @@
-import {
-  Injectable,
-  BadRequestException,
-  NotFoundException,
-} from '@nestjs/common';
-import { Prisma, StatusPagamento } from '@prisma/client';
+import { Injectable } from '@nestjs/common';
+import { FormaPagamento, Prisma, StatusPagamento } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 
-const detalhesPagamento = {
+const includePadrao = {
   aluguel: {
     include: {
       usuario: {
@@ -19,45 +15,61 @@ const detalhesPagamento = {
       jogo: true,
     },
   },
-} satisfies Prisma.PagamentoInclude;
+};
 
 @Injectable()
 export class PaymentsRepository {
   constructor(private readonly prisma: PrismaService) {}
 
-  async buscarAluguel(id: number) {
+  async buscarAluguelPorId(id: number) {
     return this.prisma.aluguel.findUnique({
       where: { id },
     });
   }
 
-  async criar(data: Prisma.PagamentoCreateInput) {
+  async somarPagamentosAtivosDoAluguel(id_aluguel: number) {
+    const resultado = await this.prisma.pagamento.aggregate({
+      where: {
+        id_aluguel,
+        status: { in: [StatusPagamento.PENDENTE, StatusPagamento.PAGO] },
+      },
+      _sum: { valor: true },
+    });
+
+    return resultado._sum.valor ?? new Prisma.Decimal(0);
+  }
+
+  async criar(dados: {
+    id_aluguel: number;
+    valor: Prisma.Decimal;
+    forma_pagamento: FormaPagamento;
+  }) {
     return this.prisma.pagamento.create({
-      data,
-      include: detalhesPagamento,
+      data: {
+        id_aluguel: dados.id_aluguel,
+        valor: dados.valor,
+        forma_pagamento: dados.forma_pagamento,
+      },
+      include: includePadrao,
     });
   }
 
-  async listarPagamentos(params: {
-    where?: Prisma.PagamentoWhereInput;
-    page?: number;
-    limit?: number;
-    orderBy?: Prisma.PagamentoOrderByWithRelationInput;
-  }) {
-    const page = params.page ?? 1;
-    const limit = Math.min(params.limit ?? 20, 100);
+  async listar(
+    where: Prisma.PagamentoWhereInput,
+    page: number,
+    limit: number,
+  ) {
+    const skip = (page - 1) * limit;
 
-    const [data, total] = await this.prisma.$transaction([
+    const [data, total] = await Promise.all([
       this.prisma.pagamento.findMany({
-        where: params.where,
-        include: detalhesPagamento,
-        orderBy: params.orderBy ?? { data_pagamento: 'desc' },
-        skip: (page - 1) * limit,
+        where,
+        include: includePadrao,
+        orderBy: { data_pagamento: 'desc' },
+        skip,
         take: limit,
       }),
-      this.prisma.pagamento.count({
-        where: params.where,
-      }),
+      this.prisma.pagamento.count({ where }),
     ]);
 
     return {
@@ -74,148 +86,72 @@ export class PaymentsRepository {
   async buscarPorId(id: number) {
     return this.prisma.pagamento.findUnique({
       where: { id },
-      include: detalhesPagamento,
+      include: includePadrao,
     });
   }
 
-  async buscarPorAluguel(id_aluguel: number) {
-    return this.prisma.pagamento.findMany({
-      where: { id_aluguel },
-      include: detalhesPagamento,
-      orderBy: { data_pagamento: 'desc' },
-    });
-  }
-
-  async confirmarPagamento(id: number) {
-    return this.prisma.pagamento.update({
-      where: { id },
-      data: { status: StatusPagamento.PAGO },
-      include: detalhesPagamento,
-    });
-  }
-
-  async solicitarEstorno(id: number) {
-    return this.prisma.pagamento.update({
-      where: { id },
-      data: { status: StatusPagamento.ESTORNADO },
-      include: detalhesPagamento,
-    });
-  }
-
-  async listarPendentes() {
-    return this.prisma.pagamento.findMany({
-      where: { status: StatusPagamento.PENDENTE },
-      include: detalhesPagamento,
-      orderBy: { data_pagamento: 'asc' },
-    });
-  }
-
-  async calcularMulta(id_aluguel: number) {
-    const aluguel = await this.prisma.aluguel.findUnique({
-      where: { id: id_aluguel },
+  async resumirPorAluguel(where: Prisma.PagamentoWhereInput) {
+    const grupos = await this.prisma.pagamento.groupBy({
+      by: ['status'],
+      where,
+      _sum: { valor: true },
     });
 
-    if (!aluguel) {
-      throw new NotFoundException('Aluguel não encontrado.');
+    let totalPago = new Prisma.Decimal(0);
+    let totalPendente = new Prisma.Decimal(0);
+
+    for (const grupo of grupos) {
+      if (grupo.status === StatusPagamento.PAGO) {
+        totalPago = grupo._sum.valor ?? new Prisma.Decimal(0);
+      }
+
+      if (grupo.status === StatusPagamento.PENDENTE) {
+        totalPendente = grupo._sum.valor ?? new Prisma.Decimal(0);
+      }
     }
 
-    const hoje = new Date();
-    const inicioHoje = new Date(hoje);
-    inicioHoje.setHours(0, 0, 0, 0);
-
-    const dataPrevista = new Date(aluguel.data_prevista_devolucao);
-    dataPrevista.setHours(0, 0, 0, 0);
-
-    const diasAtraso = Math.max(
-      0,
-      Math.ceil((inicioHoje.getTime() - dataPrevista.getTime()) / 86_400_000),
-    );
-
-    const multa = new Prisma.Decimal(aluguel.valor_diaria)
-      .mul(diasAtraso)
-      .mul(aluguel.quantidade);
-
-    return {
-      rentalId: id_aluguel,
-      dias_atraso: diasAtraso,
-      multa,
-      data_prevista_devolucao: aluguel.data_prevista_devolucao,
-    };
+    return { totalPago, totalPendente };
   }
 
-  async resumoFinanceiro(params: { startDate?: string; endDate?: string }) {
-    const start = params.startDate
-      ? this.dateBoundary(params.startDate, false)
-      : new Date(0);
+  async atualizarStatus(id: number, status: StatusPagamento) {
+    return this.prisma.pagamento.update({
+      where: { id },
+      data: { status },
+      include: includePadrao,
+    });
+  }
 
-    const end = params.endDate
-      ? this.dateBoundary(params.endDate, true)
-      : new Date();
-
-    if (start > end) {
-      throw new BadRequestException(
-        'startDate deve ser anterior ou igual a endDate.',
-      );
-    }
-
-    const where = {
+  async buscarResumoFinanceiro(inicio: Date, fim: Date) {
+    const wherePago: Prisma.PagamentoWhereInput = {
       status: StatusPagamento.PAGO,
-      data_pagamento: {
-        gte: start,
-        lte: end,
-      },
-    } satisfies Prisma.PagamentoWhereInput;
+      data_pagamento: { gte: inicio, lte: fim },
+    };
 
-    const [aggregate, count, porStatus] = await Promise.all([
+    const [agregacao, quantidadeCompensados, porStatus] = await Promise.all([
       this.prisma.pagamento.aggregate({
-        where,
+        where: wherePago,
         _sum: { valor: true },
       }),
-      this.prisma.pagamento.count({
-        where,
-      }),
+      this.prisma.pagamento.count({ where: wherePago }),
       this.prisma.pagamento.groupBy({
         by: ['status'],
-        where: {
-          data_pagamento: {
-            gte: start,
-            lte: end,
-          },
-        },
+        where: { data_pagamento: { gte: inicio, lte: fim } },
         _count: { _all: true },
         _sum: { valor: true },
       }),
     ]);
 
     return {
-      periodo: {
-        inicio: start,
-        fim: end,
-      },
-      total_arrecadado: aggregate._sum.valor ?? new Prisma.Decimal(0),
-      quantidade_pagamentos_compensados: count,
+      periodo: { inicio, fim },
+      total_arrecadado: agregacao._sum.valor ?? new Prisma.Decimal(0),
+      quantidade_pagamentos_compensados: quantidadeCompensados,
       por_status: porStatus,
     };
   }
 
-  async remover(id: number) {
+  async deletar(id: number) {
     return this.prisma.pagamento.delete({
       where: { id },
     });
-  }
-
-  async contarPagamentosDoAluguel(id_aluguel: number) {
-    return this.prisma.pagamento.count({
-      where: { id_aluguel },
-    });
-  }
-
-  private dateBoundary(value: string, endOfDay: boolean): Date {
-    if (/^\d{4}-\d{2}-\d{2}$/.test(value)) {
-      return new Date(
-        `${value}T${endOfDay ? '23:59:59.999' : '00:00:00.000'}Z`,
-      );
-    }
-    return new Date(value);
   }
 }
