@@ -17,9 +17,9 @@ export class ReviewsService {
     async create(dto: CreateReviewDto) {
         const usuario = await this.repository.buscarUsuario(dto.id_usuario);
 
-        if(!usuario) {
-            throw new NotFoundException('Usuário não encontrado');
-        }
+  async findAll(query: ListReviewsDto) {
+    const page = query.page ?? 1;
+    const limit = query.limit ?? 10;
 
         const jogo = await this.repository.buscarJogo(dto.id_jogo);
 
@@ -47,11 +47,26 @@ export class ReviewsService {
             throw new NotFoundException('Avaliação não encontrada');
         }
 
-        return avaliacao;
+    const aluguelDevolvido = await this.prisma.aluguel.findFirst({
+      where: {
+        id_usuario: dto.id_usuario,
+        id_jogo: dto.id_jogo,
+        status: StatusAluguel.DEVOLVIDO,
+      },
+    });
+
+    if (!aluguelDevolvido) {
+      throw new BadRequestException(
+        'Só é possível avaliar um jogo que já foi alugado e devolvido.',
+      );
     }
 
-    async update(id: number, dto: UpdateReviewDto) {
-        await this.findOne(id);
+    const avaliacaoExistente = await this.prisma.avaliacao.findFirst({
+      where: {
+        id_usuario: dto.id_usuario,
+        id_jogo: dto.id_jogo,
+      },
+    });
 
         return this.repository.atualizar(id, dto);
     }
@@ -61,4 +76,31 @@ export class ReviewsService {
 
        return this.repository.deletar(id);
     }
+
+    return avaliacao;
+  }
+
+  async update(id: number, dto: UpdateReviewDto) {
+    await this.findOne(id);
+
+    return this.prisma.avaliacao.update({
+      where: { id },
+      data: {
+        ...(dto.nota !== undefined && { nota: dto.nota }),
+        ...(dto.comentario !== undefined && { comentario: dto.comentario }),
+      },
+      include: {
+        usuario: true,
+        jogo: true,
+      },
+    });
+  }
+
+  async remove(id: number) {
+    await this.findOne(id);
+
+    return this.prisma.avaliacao.delete({
+      where: { id },
+    });
+  }
 }

@@ -3,11 +3,16 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+import {
+  ListGameCategoriesDto,
+  ListGameRentalsDto,
+  ListGamesDto,
+} from './dto/list-games.dto';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateGameDto } from './dto/create-game.dto';
 import { UpdateGameDto } from './dto/update-game.dto';
-import { ListGameReviewsDto } from '../reviews/dto/list-game-reviews.dto';
+import { ListGameReviewsDto } from './dto/list-games-reviews.dto';
 
 @Injectable()
 export class GamesService {
@@ -40,15 +45,66 @@ export class GamesService {
     });
   }
 
-  findAll() {
-    return this.prisma.jogo.findMany({ orderBy: { nome: 'asc' } });
+  private async listarJogos(
+    where: Prisma.JogoWhereInput,
+    page: number,
+    limit: number,
+  ) {
+    const [data, total] = await this.prisma.$transaction([
+      this.prisma.jogo.findMany({
+        where,
+        orderBy: { nome: 'asc' },
+        skip: (page - 1) * limit,
+        take: limit,
+      }),
+      this.prisma.jogo.count({ where }),
+    ]);
+
+    return {
+      data,
+      meta: { page, limit, total, pages: Math.ceil(total / limit) },
+    };
   }
 
-  findAvailable() {
-    return this.prisma.jogo.findMany({
-      where: { ativo: true, quantidade_disponivel: { gt: 0 } },
-      orderBy: { nome: 'asc' },
-    });
+  async findAvailable(query: ListGamesDto) {
+    const page = query.page ?? 1;
+    const limit = query.limit ?? 10;
+
+    const where: Prisma.JogoWhereInput = {
+      ativo: true,
+      quantidade_disponivel: { gt: 0 },
+      ...(query.nome && { nome: { contains: query.nome } }),
+      ...(query.complexidade !== undefined && {
+        complexidade: query.complexidade,
+      }),
+      ...(query.ano !== undefined && { ano_lancamento: query.ano }),
+      ...(query.jogadores !== undefined && {
+        numero_jogadores_min: { lte: query.jogadores },
+        numero_jogadores_max: { gte: query.jogadores },
+      }),
+    };
+
+    return this.listarJogos(where, page, limit);
+  }
+
+  async findAll(query: ListGamesDto) {
+    const page = query.page ?? 1;
+    const limit = query.limit ?? 10;
+
+    const where: Prisma.JogoWhereInput = {
+      ...(query.nome && { nome: { contains: query.nome } }),
+      ...(query.ativo !== undefined && { ativo: query.ativo }),
+      ...(query.complexidade !== undefined && {
+        complexidade: query.complexidade,
+      }),
+      ...(query.ano !== undefined && { ano_lancamento: query.ano }),
+      ...(query.jogadores !== undefined && {
+        numero_jogadores_min: { lte: query.jogadores },
+        numero_jogadores_max: { gte: query.jogadores },
+      }),
+    };
+
+    return this.listarJogos(where, page, limit);
   }
 
   async findOne(id: number) {
@@ -69,12 +125,69 @@ export class GamesService {
     });
   }
 
+  async findReviews(id: number, query: ListGameReviewsDto) {
+    await this.findOne(id);
+
+    const page = query.page ?? 1;
+    const limit = query.limit ?? 10;
+    const where: Prisma.AvaliacaoWhereInput = {
+      id_jogo: id,
+      ...(query.nota !== undefined && { nota: query.nota }),
+      ...(query.usuario && {
+        usuario: { nome: { contains: query.usuario } },
+      }),
+    };
+
+    const [data, total] = await this.prisma.$transaction([
+      this.prisma.avaliacao.findMany({
+        where,
+        include: {
+          usuario: { select: { id: true, nome: true } },
+        },
+        orderBy: { data_avaliacao: 'desc' },
+        skip: (page - 1) * limit,
+        take: limit,
+      }),
+      this.prisma.avaliacao.count({ where }),
+    ]);
+
+    return {
+      data,
+      meta: { page, limit, total, pages: Math.ceil(total / limit) },
+    };
+  }
+
+  async findReviewStats(id: number, query: ListGameReviewsDto) {
+    await this.findOne(id);
+
+    const where: Prisma.AvaliacaoWhereInput = {
+      id_jogo: id,
+      ...(query.nota !== undefined && { nota: query.nota }),
+      ...(query.usuario && {
+        usuario: { nome: { contains: query.usuario } },
+      }),
+    };
+
+    const stats = await this.prisma.avaliacao.aggregate({
+      where,
+      _avg: { nota: true },
+      _max: { nota: true },
+      _min: { nota: true },
+      _count: true,
+    });
+
+    return {
+      media: stats._avg.nota,
+      maiorNota: stats._max.nota,
+      menorNota: stats._min.nota,
+      totalAvaliacoes: stats._count,
+    };
+  }
+
   async update(id: number, dto: UpdateGameDto) {
     const jogo = await this.findOne(id);
-    const minJogadores =
-      dto.numero_jogadores_min ?? jogo.numero_jogadores_min;
-    const maxJogadores =
-      dto.numero_jogadores_max ?? jogo.numero_jogadores_max;
+    const minJogadores = dto.numero_jogadores_min ?? jogo.numero_jogadores_min;
+    const maxJogadores = dto.numero_jogadores_max ?? jogo.numero_jogadores_max;
 
     if (minJogadores > maxJogadores) {
       throw new BadRequestException(
@@ -157,105 +270,6 @@ export class GamesService {
     });
   }
 
-  //Busca um jogo por categoria
-  async findCategories(id: number) {
-    await this.findOne(id);
-
-    return this.prisma.categoriaJogo.findMany({
-      where: { id_jogo: id,},
-      include: { categoria: true, }
-    });
-  }
-
-  //Acha um jogo atráves do review
-  async findReviews(
-    id: number,
-    query: ListGameReviewsDto,
-  ) {
-    await this.findOne(id);
-
-    const page = query.page ?? 1;
-    const limit = query.limit ?? 10;
-
-    const where: any = {
-      id_jogo: id,
-    };
-
-    if(query.nota) {
-      where.nota = query.nota;
-    }
-
-    if(query.usuario) {
-      where.usuario = {
-        nome: {
-          contains: query.usuario,
-        },
-      };
-    }
-    const [data, total] = await Promise.all([
-      this.prisma.avaliacao.findMany({
-        where,
-        include: {
-          usuario: true,
-        },
-        skip: (page - 1) * limit,
-        take: limit,
-        orderBy: {
-          data_avaliacao: 'desc',
-        },
-      }),
-      this.prisma.avaliacao.count({
-        where,
-      }),
-    ]);
-
-    return {
-      data,
-      meta: {
-        page,
-        limit,
-        total,
-        pages: Math.ceil(total / limit),
-      },
-    };
-  }
-
-  async findReviewStats(
-    id: number,
-    query: ListGameReviewsDto
-  ) {
-    await this.findOne(id);
-
-    const where: any = {
-      id_jogo: id,
-    };
-
-    if(query.nota) {
-      where.nota = query.nota;
-    }
-
-    const stats = await this.prisma.avaliacao.aggregate({
-      where,
-      _avg: {
-        nota: true,
-      },
-      _max: {
-        nota: true,
-      },
-      _min: {
-        nota: true,
-      },
-      _count: true,
-    });
-
-    return {
-      media: stats._avg.nota,
-      maiorNota: stats._max.nota,
-      menorNota: stats._min.nota,
-      totalAvaliacoes: stats._count,
-    };
-  }
-
   async remove(id: number) {
     await this.findOne(id);
 
@@ -269,5 +283,15 @@ export class GamesService {
     }
 
     return this.prisma.jogo.delete({ where: { id } });
+  }
+
+  //Busca um jogo por categoria
+  async findCategories(id: number) {
+    await this.findOne(id);
+
+    return this.prisma.categoriaJogo.findMany({
+      where: { id_jogo: id },
+      include: { categoria: true },
+    });
   }
 }

@@ -3,52 +3,15 @@ import { PrismaService } from '../prisma/prisma.service';
 import { CreateCategoryDto } from './dto/create-category.dto';
 import { UpdateCategoryDto } from './dto/update-category.dto';
 import { LinkCategoryGameDto } from './dto/link-category-game.dto';
-import { ListCategoryGamesDto } from './dto/list-category-games.dto';
-import { ListCategoriesDto } from './dto/list-categories.dto';
 
 @Injectable()
 export class CategoriesRepository {
   constructor(private readonly prisma: PrismaService) {}
 
-  async buscarTodas(query: ListCategoriesDto) {
-    const page = query.page ?? 1;
-    const limit = query.limit ?? 10;
-
-    const where: any = {};
-
-    if(query.id) {
-      where.id = query.id;
-    }
-    if(query.nome) {
-      where.nome = {
-        contains: query.nome,
-      };
-    }
-
-    const [data, total] = await Promise.all([
-      this.prisma.categoria.findMany({
-        where,
-        orderBy: {
-          nome: 'asc',
-        },
-        skip: (page - 1) * limit,
-        take: limit,
-      }),
-
-      this.prisma.categoria.count({
-        where,
-      }),
-    ]);
-
-    return {
-      data,
-      meta: {
-        page,
-        limit,
-        total,
-        pages: Math.ceil(total / limit),
-      },
-    };
+  async buscarTodas() {
+    return this.prisma.categoria.findMany({
+      orderBy: { nome: 'asc' },
+    });
   }
 
   async buscarPorId(id: number) {
@@ -98,64 +61,23 @@ export class CategoriesRepository {
     });
   }
 
-  async listarJogosDaCategoria(
-    id_categoria: number,
-    apenasDisponiveis = false,
-    query?: ListCategoryGamesDto
-  ) {
-    
-    const page = query?.page ?? 1;
-    const limit = query?.limit ?? 10;
-    
-    const where: any = {
-      id_categoria,
-    };
+  async listarJogosDaCategoria(id_categoria: number, apenasDisponiveis = false) {
 
-    where.jogo = {};
+    let filtro: any = { id_categoria };
 
-    if(query?.nome) {
-      where.jogo.nome = {
-        contains: query.nome,
+    if (apenasDisponiveis) {
+      filtro = {
+        id_categoria,
+        jogo: {
+          ativo: true,
+          quantidade_disponivel: { gt: 0 },
+        },
       };
     }
 
-    if(query?.ativo !== undefined) {
-      where.jogo.ativo = query.ativo;
-    }
-
-    if(apenasDisponiveis) {
-      where.jogo.ativo = true;
-
-      where.jogo.quantidade_disponivel = {
-        gt: 0,
-      };
-    }
-
-    const [data, total] = await Promise.all([
-      this.prisma.categoriaJogo.findMany({
-        where,
-        include: {
-          jogo: true,
-        },
-        skip: (page - 1) * limit,
-        take: limit,
-        orderBy: {
-          id_jogo: 'asc',
-        },
-      }),
-
-      this.prisma.categoriaJogo.count({
-        where,
-      }),
-    ]);
-    return {
-      data,
-      meta: {
-        page,
-        limit,
-        total,
-        pages: Math.ceil(total / limit),
-      },
-    };
+    return this.prisma.categoriaJogo.findMany({
+      where: filtro,
+      include: { jogo: true },
+    });
   }
 }

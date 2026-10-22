@@ -1,229 +1,311 @@
 import {
   BadRequestException,
+  ForbiddenException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
 import { Prisma, StatusPagamento } from '@prisma/client';
-import { PrismaService } from '../prisma/prisma.service';
 import { CreatePaymentDto } from './dto/create-payment.dto';
 import { ListPaymentsDto } from './dto/list-payments.dto';
+import { PaymentsRepository } from './payments.repository';
 
-const paymentDetails = {
-  aluguel: {
-    include: {
-      usuario: { select: { id: true, nome: true, email: true } },
-      jogo: true,
-    },
-  },
-} satisfies Prisma.PagamentoInclude;
+export interface CurrentPaymentUser {
+  id: number;
+  role: string;
+}
 
 @Injectable()
 export class PaymentsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(private readonly repository: PaymentsRepository) {}
 
-  async create(dto: CreatePaymentDto) {
-    return this.prisma.$transaction(async (tx) => {
-      const rental = await tx.aluguel.findUnique({ where: { id: dto.id_aluguel } });
-      if (!rental) throw new NotFoundException('Aluguel não encontrado.');
-      if (rental.status === 'CANCELADO') {
-        throw new BadRequestException('Não é possível pagar um aluguel cancelado.');
+  private exigirAdmin(usuario: CurrentPaymentUser) {
+    if (usuario.role !== 'ADMIN') {
+      throw new ForbiddenException('Acesso restrito a administradores.');
+    }
+  }
+
+  private montarFiltroDatas(query: ListPaymentsDto) {
+    const data: Prisma.DateTimeFilter = {};
+
+    if (query.startDate) {
+      const inicio = new Date(query.startDate);
+
+      if (/^\d{4}-\d{2}-\d{2}$/.test(query.startDate)) {
+        inicio.setUTCHours(0, 0, 0, 0);
       }
 
-      const paidOrPending = await tx.pagamento.aggregate({
-        where: {
-          id_aluguel: dto.id_aluguel,
-          status: { in: [StatusPagamento.PENDENTE, StatusPagamento.PAGO] },
-        },
-        _sum: { valor: true },
-      });
-      const rentalDays = Math.max(
-        1,
-        Math.ceil(
-          (this.startOfDay(rental.data_prevista_devolucao).getTime() -
-            this.startOfDay(rental.data_aluguel).getTime()) /
-            86_400_000,
-        ),
+      data.gte = inicio;
+    }
+
+    if (query.endDate) {
+      const fim = new Date(query.endDate);
+
+      if (/^\d{4}-\d{2}-\d{2}$/.test(query.endDate)) {
+        fim.setUTCHours(23, 59, 59, 999);
+      }
+
+      data.lte = fim;
+    }
+
+    if (data.gte && data.lte && data.gte > data.lte) {
+      throw new BadRequestException(
+        'startDate deve ser anterior ou igual a endDate.',
       );
-      const rentalValue =
-        rental.valor_total ??
-        rental.valor_diaria.mul(rental.quantidade).mul(rentalDays);
-      const balance = rentalValue.sub(paidOrPending._sum.valor ?? 0);
-      if (new Prisma.Decimal(dto.valor).greaterThan(balance)) {
-        throw new BadRequestException('O pagamento excede o saldo do aluguel.');
-      }
+    }
 
-      return tx.pagamento.create({
-        data: {
-          id_aluguel: dto.id_aluguel,
-          valor: new Prisma.Decimal(dto.valor),
-          forma_pagamento: dto.forma_pagamento,
-        },
-        include: paymentDetails,
-      });
+    return Object.keys(data).length > 0 ? data : undefined;
+  }
+
+  private montarFiltro(
+    query: ListPaymentsDto,
+    usuario: CurrentPaymentUser,
+    status?: StatusPagamento,
+  ): Prisma.PagamentoWhereInput {
+    const where: Prisma.PagamentoWhereInput = {};
+
+    if (status !== undefined) {
+      where.status = status;
+    } else if (query.status !== undefined) {
+      where.status = query.status;
+    }
+
+    if (query.forma_pagamento !== undefined) {
+      where.forma_pagamento = query.forma_pagamento;
+    }
+
+    const datas = this.montarFiltroDatas(query);
+
+    if (datas) {
+      where.data_pagamento = datas;
+    }
+
+    if (usuario.role !== 'ADMIN') {
+      where.aluguel = { is: { id_usuario: usuario.id } };
+    }
+
+    return where;
+  }
+
+  private async verificarAcesso(
+    id: number,
+    usuario: CurrentPaymentUser,
+  ) {
+    const pagamento = await this.repository.buscarPorId(id);
+
+    if (!pagamento) {
+      throw new NotFoundException('Pagamento não encontrado.');
+    }
+
+    if (
+      usuario.role !== 'ADMIN' &&
+      pagamento.aluguel.id_usuario !== usuario.id
+    ) {
+      throw new NotFoundException('Pagamento não encontrado.');
+    }
+
+    return pagamento;
+  }
+
+  async create(dto: CreatePaymentDto, usuario: CurrentPaymentUser) {
+    const aluguel = await this.repository.buscarAluguelPorId(dto.id_aluguel);
+
+    if (!aluguel) {
+      throw new NotFoundException('Aluguel não encontrado.');
+    }
+
+    if (usuario.role !== 'ADMIN' && aluguel.id_usuario !== usuario.id) {
+      throw new NotFoundException('Aluguel não encontrado.');
+    }
+
+    if (aluguel.status === 'CANCELADO') {
+      throw new BadRequestException(
+        'Não é possível pagar um aluguel cancelado.',
+      );
+    }
+
+    const totalPagoOuPendente =
+      await this.repository.somarPagamentosAtivosDoAluguel(dto.id_aluguel);
+
+    const dataInicio = new Date(aluguel.data_aluguel);
+    dataInicio.setHours(0, 0, 0, 0);
+
+    const dataPrevista = new Date(aluguel.data_prevista_devolucao);
+    dataPrevista.setHours(0, 0, 0, 0);
+
+    const diffMs = dataPrevista.getTime() - dataInicio.getTime();
+    const diasAluguel = Math.max(1, Math.ceil(diffMs / (1000 * 60 * 60 * 24)));
+
+    const valorAluguel =
+      aluguel.valor_total ??
+      aluguel.valor_diaria.mul(aluguel.quantidade).mul(diasAluguel);
+
+    const saldoRestante = valorAluguel.sub(totalPagoOuPendente);
+
+    if (new Prisma.Decimal(dto.valor).greaterThan(saldoRestante)) {
+      throw new BadRequestException('O pagamento excede o saldo do aluguel.');
+    }
+
+    return this.repository.criar({
+      id_aluguel: dto.id_aluguel,
+      valor: new Prisma.Decimal(dto.valor),
+      forma_pagamento: dto.forma_pagamento,
     });
   }
 
-  async findAll(query: ListPaymentsDto) {
-    const page = query.page ?? 1;
-    const limit = Math.min(query.limit ?? 20, 100);
-    const dateFilter: Prisma.DateTimeFilter = {};
-    if (query.startDate) dateFilter.gte = this.dateBoundary(query.startDate, false);
-    if (query.endDate) dateFilter.lte = this.dateBoundary(query.endDate, true);
-    if (query.startDate && query.endDate && dateFilter.gte! > dateFilter.lte!) {
-      throw new BadRequestException('startDate deve ser anterior ou igual a endDate.');
+  findAll(query: ListPaymentsDto, usuario: CurrentPaymentUser) {
+    return this.repository.listar(
+      this.montarFiltro(query, usuario),
+      query.page ?? 1,
+      query.limit ?? 20,
+    );
+  }
+
+  async findOne(id: number, usuario: CurrentPaymentUser) {
+    return this.verificarAcesso(id, usuario);
+  }
+
+  async findByRental(
+    rentalId: number,
+    query: ListPaymentsDto,
+    usuario: CurrentPaymentUser,
+  ) {
+    const aluguel = await this.repository.buscarAluguelPorId(rentalId);
+
+    if (!aluguel) {
+      throw new NotFoundException('Aluguel não encontrado.');
     }
-    const where: Prisma.PagamentoWhereInput =
-      query.startDate || query.endDate ? { data_pagamento: dateFilter } : {};
-    const [data, total] = await this.prisma.$transaction([
-      this.prisma.pagamento.findMany({
-        where,
-        include: paymentDetails,
-        orderBy: { data_pagamento: 'desc' },
-        skip: (page - 1) * limit,
-        take: limit,
-      }),
-      this.prisma.pagamento.count({ where }),
+
+    if (usuario.role !== 'ADMIN' && aluguel.id_usuario !== usuario.id) {
+      throw new NotFoundException('Aluguel não encontrado.');
+    }
+
+    const where: Prisma.PagamentoWhereInput = {
+      ...this.montarFiltro(query, usuario),
+      id_aluguel: rentalId,
+    };
+
+    const [resultado, totais] = await Promise.all([
+      this.repository.listar(where, query.page ?? 1, query.limit ?? 20),
+      this.repository.resumirPorAluguel(where),
     ]);
-    return { data, meta: { page, limit, total, pages: Math.ceil(total / limit) } };
+
+    return {
+      aluguel,
+      pagamentos: resultado.data,
+      meta: resultado.meta,
+      total_pago: totais.totalPago,
+      total_pendente: totais.totalPendente,
+    };
   }
 
-  async findOne(id: number) {
-    const payment = await this.prisma.pagamento.findUnique({
-      where: { id },
-      include: paymentDetails,
-    });
-    if (!payment) throw new NotFoundException('Pagamento não encontrado.');
-    return payment;
+  async findPending(query: ListPaymentsDto, usuario: CurrentPaymentUser) {
+    return this.repository.listar(
+      this.montarFiltro(query, usuario, StatusPagamento.PENDENTE),
+      query.page ?? 1,
+      query.limit ?? 20,
+    );
   }
 
-  async findByRental(rentalId: number) {
-    const rental = await this.prisma.aluguel.findUnique({ where: { id: rentalId } });
-    if (!rental) throw new NotFoundException('Aluguel não encontrado.');
-    const payments = await this.prisma.pagamento.findMany({
-      where: { id_aluguel: rentalId },
-      include: paymentDetails,
-      orderBy: { data_pagamento: 'desc' },
-    });
-    const totalPago = payments
-      .filter((payment) => payment.status === StatusPagamento.PAGO)
-      .reduce((sum, payment) => sum.add(payment.valor), new Prisma.Decimal(0));
-    const totalPendente = payments
-      .filter((payment) => payment.status === StatusPagamento.PENDENTE)
-      .reduce((sum, payment) => sum.add(payment.valor), new Prisma.Decimal(0));
-    return { aluguel: rental, pagamentos: payments, total_pago: totalPago, total_pendente: totalPendente };
-  }
+  async confirm(id: number, usuario: CurrentPaymentUser) {
+    this.exigirAdmin(usuario);
 
-  async confirm(id: number) {
-    return this.prisma.$transaction(async (tx) => {
-      const payment = await tx.pagamento.findUnique({ where: { id } });
-      if (!payment) throw new NotFoundException('Pagamento não encontrado.');
-      if (payment.status !== StatusPagamento.PENDENTE) {
-        throw new BadRequestException('Somente pagamentos pendentes podem ser confirmados.');
-      }
-      return tx.pagamento.update({
-        where: { id },
-        data: { status: StatusPagamento.PAGO },
-        include: paymentDetails,
-      });
-    });
-  }
+    const pagamento = await this.verificarAcesso(id, usuario);
 
-  async refund(id: number) {
-    const payment = await this.prisma.pagamento.findUnique({ where: { id } });
-    if (!payment) throw new NotFoundException('Pagamento não encontrado.');
-    if (payment.status !== StatusPagamento.PAGO) {
-      throw new BadRequestException('Somente pagamentos realizados podem ser estornados.');
+    if (pagamento.status !== StatusPagamento.PENDENTE) {
+      throw new BadRequestException(
+        'Somente pagamentos pendentes podem ser confirmados.',
+      );
     }
-    return this.prisma.pagamento.update({
-      where: { id },
-      data: { status: StatusPagamento.ESTORNADO },
-      include: paymentDetails,
-    });
+
+    return this.repository.atualizarStatus(id, StatusPagamento.PAGO);
   }
 
-  findPending() {
-    return this.prisma.pagamento.findMany({
-      where: { status: StatusPagamento.PENDENTE },
-      include: paymentDetails,
-      orderBy: { data_pagamento: 'asc' },
-    });
+  async refund(id: number, usuario: CurrentPaymentUser) {
+    this.exigirAdmin(usuario);
+
+    const pagamento = await this.verificarAcesso(id, usuario);
+
+    if (pagamento.status !== StatusPagamento.PAGO) {
+      throw new BadRequestException(
+        'Somente pagamentos realizados podem ser estornados.',
+      );
+    }
+
+    return this.repository.atualizarStatus(id, StatusPagamento.ESTORNADO);
   }
 
-  async calculateFine(rentalId: number) {
-    const rental = await this.prisma.aluguel.findUnique({ where: { id: rentalId } });
-    if (!rental) throw new NotFoundException('Aluguel não encontrado.');
-    const today = new Date();
-    const todayStart = new Date(today);
-    todayStart.setHours(0, 0, 0, 0);
-    const dueDate = new Date(rental.data_prevista_devolucao);
-    dueDate.setHours(0, 0, 0, 0);
-    // O cálculo usa dias corridos completos entre a data prevista e hoje, com a mesma fórmula aplicada na devolução.
-    const lateDays = Math.max(0, Math.ceil((todayStart.getTime() - dueDate.getTime()) / 86_400_000));
-    const fine = new Prisma.Decimal(rental.valor_diaria)
-      .mul(lateDays)
-      .mul(rental.quantidade);
+  async calculateFine(rentalId: number, usuario: CurrentPaymentUser) {
+    const aluguel = await this.repository.buscarAluguelPorId(rentalId);
+
+    if (!aluguel) {
+      throw new NotFoundException('Aluguel não encontrado.');
+    }
+
+    if (usuario.role !== 'ADMIN' && aluguel.id_usuario !== usuario.id) {
+      throw new NotFoundException('Aluguel não encontrado.');
+    }
+
+    const hoje = new Date();
+    hoje.setHours(0, 0, 0, 0);
+
+    const dataPrevista = new Date(aluguel.data_prevista_devolucao);
+    dataPrevista.setHours(0, 0, 0, 0);
+
+    const diffMs = hoje.getTime() - dataPrevista.getTime();
+    const diasAtraso = Math.max(0, Math.ceil(diffMs / (1000 * 60 * 60 * 24)));
+
+    const multa = new Prisma.Decimal(aluguel.valor_diaria)
+      .div(2)
+      .mul(diasAtraso)
+      .mul(aluguel.quantidade);
+
     return {
       rentalId,
-      dias_atraso: lateDays,
-      multa: fine,
-      data_prevista_devolucao: rental.data_prevista_devolucao,
+      dias_atraso: diasAtraso,
+      multa,
+      data_prevista_devolucao: aluguel.data_prevista_devolucao,
     };
   }
 
-  async summary(query: ListPaymentsDto) {
-    const start = query.startDate
-      ? this.dateBoundary(query.startDate, false)
+  async summary(query: ListPaymentsDto, usuario: CurrentPaymentUser) {
+    this.exigirAdmin(usuario);
+
+    const inicio = query.startDate
+      ? new Date(query.startDate)
       : new Date(0);
-    const end = query.endDate
-      ? this.dateBoundary(query.endDate, true)
-      : new Date();
-    if (start > end) {
-      throw new BadRequestException('startDate deve ser anterior ou igual a endDate.');
+    const fim = query.endDate ? new Date(query.endDate) : new Date();
+
+    if (query.startDate && /^\d{4}-\d{2}-\d{2}$/.test(query.startDate)) {
+      inicio.setUTCHours(0, 0, 0, 0);
     }
-    const where = {
-      status: StatusPagamento.PAGO,
-      data_pagamento: { gte: start, lte: end },
-    } satisfies Prisma.PagamentoWhereInput;
-    const [aggregate, count, byStatus] = await Promise.all([
-      this.prisma.pagamento.aggregate({ where, _sum: { valor: true } }),
-      this.prisma.pagamento.count({ where }),
-      this.prisma.pagamento.groupBy({
-        by: ['status'],
-        where: { data_pagamento: { gte: start, lte: end } },
-        _count: { _all: true },
-        _sum: { valor: true },
-      }),
-    ]);
-    return {
-      periodo: { inicio: start, fim: end },
-      total_arrecadado: aggregate._sum.valor ?? new Prisma.Decimal(0),
-      quantidade_pagamentos_compensados: count,
-      por_status: byStatus,
-    };
+
+    if (query.endDate && /^\d{4}-\d{2}-\d{2}$/.test(query.endDate)) {
+      fim.setUTCHours(23, 59, 59, 999);
+    }
+
+    if (inicio > fim) {
+      throw new BadRequestException(
+        'startDate deve ser anterior ou igual a endDate.',
+      );
+    }
+
+    return this.repository.buscarResumoFinanceiro(inicio, fim);
   }
 
-  async remove(id: number) {
-    const payment = await this.prisma.pagamento.findUnique({ where: { id } });
-    if (!payment) throw new NotFoundException('Pagamento não encontrado.');
+  async remove(id: number, usuario: CurrentPaymentUser) {
+    this.exigirAdmin(usuario);
+
+    const pagamento = await this.verificarAcesso(id, usuario);
+
     if (
-      payment.status !== StatusPagamento.PENDENTE &&
-      payment.status !== StatusPagamento.CANCELADO
+      pagamento.status !== StatusPagamento.PENDENTE &&
+      pagamento.status !== StatusPagamento.CANCELADO
     ) {
-      throw new BadRequestException('Somente pagamentos pendentes ou cancelados podem ser excluídos.');
+      throw new BadRequestException(
+        'Somente pagamentos pendentes ou cancelados podem ser excluídos.',
+      );
     }
-    return this.prisma.pagamento.delete({ where: { id } });
-  }
 
-  private startOfDay(date: Date): Date {
-    const result = new Date(date);
-    result.setHours(0, 0, 0, 0);
-    return result;
-  }
-
-  private dateBoundary(value: string, endOfDay: boolean): Date {
-    if (/^\d{4}-\d{2}-\d{2}$/.test(value)) {
-      return new Date(`${value}T${endOfDay ? '23:59:59.999' : '00:00:00.000'}Z`);
-    }
-    return new Date(value);
+    return this.repository.deletar(id);
   }
 }

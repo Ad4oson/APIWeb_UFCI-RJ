@@ -1,13 +1,17 @@
 import {
-    Body,
-    Controller,
-    Delete,
-    Get,
-    Param,
-    ParseIntPipe,
-    Patch,
-    Post,
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  ParseIntPipe,
+  Patch,
+  Post,
+  Query,
+  UseInterceptors,
 } from '@nestjs/common';
+import { ApiBody, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
+import { CacheInterceptor } from '@nestjs/cache-manager';
 import { CategoriesService } from './categories.service';
 import { CreateCategoryDto } from './dto/create-category.dto';
 import { LinkCategoryGameDto } from './dto/link-category-game.dto';
@@ -21,31 +25,14 @@ import { ListCategoryGamesDto } from './dto/list-category-games.dto';
 @ApiTags('Categorias')
 @Controller('categories')
 export class CategoriesController {
-    constructor(
-        private readonly categories: CategoriesService,
-    ) {}
+  constructor(private readonly categories: CategoriesService) {}
 
-    //Cria uma categoria de jogos
-    @Post()
-    create(
-        @Body() dto: CreateCategoryDto,) {
-        return this.categories.create(dto);
-    }
-    
-    //Lista todas as categorias cadastradas
-    @ApiOperation({
-        summary: 'Listar categorias',
-    })
-    @ApiResponse({
-        status: 200,
-        description: 'Lista paginada de categorias',
-    })
-    @Get()
-    findAll(
-        @Query() query: ListCategoriesDto,
-    ) {
-        return this.categories.findAll(query);
-    }
+  @Post()
+  @ApiOperation({ summary: 'Cria uma categoria de jogo' })
+  @ApiBody({ type: CreateCategoryDto })
+  create(@Body() dto: CreateCategoryDto) {
+    return this.categories.create(dto);
+  }
 
     //Busca uma categoria pelo identificador
     @ApiParam({

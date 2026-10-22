@@ -79,13 +79,43 @@ import {
     async validate(userId: number) {
         const usuario = await this.usersRepository.buscarPorId(userId);
 
-        if(!usuario) {
-            throw new UnauthorizedException('Usuário não encontrado');
-        }
+    const payload = {
+      sub: usuario.id,
+      email: usuario.email,
+      role: usuario.role,
+    };
 
-        return {
-            valid: true,
-            usuario,
-        };
+    return {
+      access_token: await this.jwtService.signAsync(payload),
+      usuario: {
+        id: usuario.id,
+        nome: usuario.nome,
+        email: usuario.email,
+        role: usuario.role,
+      },
+    };
+  }
+
+  async me(userId: number) {
+    const usuario = await this.usersRepository.buscarPorId(userId);
+
+    if (!usuario) {
+      throw new UnauthorizedException('Usuário não encontrado');
     }
- }
+
+    return usuario;
+  }
+
+  async validate(userId: number) {
+    const usuario = await this.usersRepository.buscarPorId(userId);
+
+    if (!usuario) {
+      throw new UnauthorizedException('Usuário não encontrado');
+    }
+
+    return {
+      valid: true,
+      usuario,
+    };
+  }
+}

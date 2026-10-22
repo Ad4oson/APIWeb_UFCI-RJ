@@ -1,12 +1,18 @@
-import { Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable } from '@nestjs/common';
 import { Prisma, StatusAluguel, StatusPagamento } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 
-const detalhes = {
-  usuario: { select: { id: true, nome: true, email: true } },
+const includeDetalhes = {
+  usuario: {
+    select: {
+      id: true,
+      nome: true,
+      email: true,
+    },
+  },
   jogo: true,
   pagamentos: true,
-} satisfies Prisma.AluguelInclude;
+};
 
 @Injectable()
 export class RentalsRepository {
@@ -23,34 +29,51 @@ export class RentalsRepository {
   async buscarPorId(id: number) {
     return this.prisma.aluguel.findUnique({
       where: { id },
-      include: detalhes,
+      include: includeDetalhes,
     });
   }
 
-  async listar(where: Prisma.AluguelWhereInput, skip: number, take: number) {
-    return this.prisma.$transaction([
+  async listar(
+    where: Prisma.AluguelWhereInput,
+    page: number,
+    limit: number,
+  ) {
+    const skip = (page - 1) * limit;
+
+    const [data, total] = await Promise.all([
       this.prisma.aluguel.findMany({
         where,
-        include: detalhes,
+        include: includeDetalhes,
         orderBy: { data_aluguel: 'desc' },
         skip,
-        take,
+        take: limit,
       }),
       this.prisma.aluguel.count({ where }),
     ]);
+
+    return {
+      data,
+      meta: {
+        page,
+        limit,
+        total,
+        pages: Math.ceil(total / limit),
+      },
+    };
   }
 
   async criarAluguel(
-    id_usuario: number, 
-    id_jogo: number, 
-    quantidade: number, 
-    data_prevista: Date, 
+    id_usuario: number,
+    id_jogo: number,
+    quantidade: number,
+    data_prevista: Date,
     valor_diaria: Prisma.Decimal,
     valor_total: Prisma.Decimal,
-    local?: boolean,
-    observacoes?: string
+    local: boolean,
+    observacoes?: string,
   ) {
     return this.prisma.$transaction(async (tx) => {
+
       const reserva = await tx.jogo.updateMany({
         where: {
           id: id_jogo,
@@ -61,7 +84,7 @@ export class RentalsRepository {
       });
 
       if (reserva.count === 0) {
-        throw new Error('ESTOQUE_INSUFICIENTE');
+        throw new BadRequestException('Estoque insuficiente para este jogo ou o jogo está inativo.');
       }
 
       return tx.aluguel.create({
@@ -75,12 +98,19 @@ export class RentalsRepository {
           local,
           observacoes,
         },
-        include: detalhes,
+        include: includeDetalhes,
       });
     });
   }
 
-  async devolver(id: number, data_devolucao: Date, novoValorTotal: Prisma.Decimal, quantidade: number, id_jogo: number, multa: Prisma.Decimal) {
+  async devolver(
+    id: number,
+    data_devolucao: Date,
+    novoValorTotal: Prisma.Decimal,
+    quantidade: number,
+    id_jogo: number,
+    multa: Prisma.Decimal,
+  ) {
     return this.prisma.$transaction(async (tx) => {
       const transicao = await tx.aluguel.updateMany({
         where: {
@@ -95,7 +125,7 @@ export class RentalsRepository {
       });
 
       if (transicao.count === 0) {
-        throw new Error('NAO_PODE_DEVOLVER');
+        throw new BadRequestException('Este aluguel não pode ser devolvido pois já foi finalizado ou cancelado.');
       }
 
       await tx.jogo.update({
@@ -103,9 +133,10 @@ export class RentalsRepository {
         data: { quantidade_disponivel: { increment: quantidade } },
       });
 
-      let finePayment = null;
+      let pagamentoMulta = null;
+
       if (multa.greaterThan(0)) {
-        finePayment = await tx.pagamento.create({
+        pagamentoMulta = await tx.pagamento.create({
           data: {
             id_aluguel: id,
             valor: multa,
@@ -114,8 +145,12 @@ export class RentalsRepository {
         });
       }
 
-      const atualizado = await tx.aluguel.findUniqueOrThrow({ where: { id } });
-      return { atualizado, finePayment };
+      const atualizado = await tx.aluguel.findUnique({
+        where: { id },
+        include: includeDetalhes,
+      });
+
+      return { atualizado, pagamentoMulta };
     });
   }
 
@@ -127,7 +162,7 @@ export class RentalsRepository {
       });
 
       if (transicao.count === 0) {
-        throw new Error('NAO_PODE_CANCELAR');
+        throw new BadRequestException('Somente aluguéis ativos podem ser cancelados.');
       }
 
       await tx.jogo.update({
@@ -135,57 +170,54 @@ export class RentalsRepository {
         data: { quantidade_disponivel: { increment: quantidade } },
       });
 
-      return tx.aluguel.findUniqueOrThrow({ where: { id } });
+      return tx.aluguel.findUnique({
+        where: { id },
+        include: includeDetalhes,
+      });
     });
   }
 
-  async excluir(id: number, status: StatusAluguel, quantidade: number, id_jogo: number) {
+  async contarPagamentosDoAluguel(id_aluguel: number) {
+    return this.prisma.pagamento.count({
+      where: { id_aluguel },
+    });
+  }
+
+  async excluir(
+    id: number,
+    status: StatusAluguel,
+    quantidade: number,
+    id_jogo: number,
+  ) {
     return this.prisma.$transaction(async (tx) => {
-      if (status === StatusAluguel.ATIVO || status === StatusAluguel.ATRASADO) {
+      if (
+        status === StatusAluguel.ATIVO ||
+        status === StatusAluguel.ATRASADO
+      ) {
         await tx.jogo.update({
           where: { id: id_jogo },
           data: { quantidade_disponivel: { increment: quantidade } },
         });
       }
+
       return tx.aluguel.delete({ where: { id } });
     });
   }
 
-  async buscarPorUsuarioLista(userId: number) {
-    return this.prisma.aluguel.findMany({
-      where: { id_usuario: userId },
-      include: detalhes,
-      orderBy: { data_aluguel: 'desc' },
-    });
-  }
+  async atualizarAtrasados(hoje: Date, id_usuario?: number) {
 
-  async buscarAtivosLista(hoje: Date) {
-    return this.prisma.aluguel.findMany({
-      where: {
-        status: StatusAluguel.ATIVO,
-        data_prevista_devolucao: { gte: hoje },
-      },
-      include: detalhes,
-      orderBy: { data_prevista_devolucao: 'asc' },
-    });
-  }
+    const whereClause: Prisma.AluguelWhereInput = {
+      status: StatusAluguel.ATIVO,
+      data_prevista_devolucao: { lt: hoje },
+    };
 
-  async processarAtrasados(hoje: Date) {
+    if (id_usuario !== undefined) {
+      whereClause.id_usuario = id_usuario;
+    }
+
     await this.prisma.aluguel.updateMany({
-      where: {
-        status: StatusAluguel.ATIVO,
-        data_prevista_devolucao: { lt: hoje },
-      },
+      where: whereClause,
       data: { status: StatusAluguel.ATRASADO },
-    });
-
-    return this.prisma.aluguel.findMany({
-      where: {
-        status: StatusAluguel.ATRASADO,
-        data_prevista_devolucao: { lt: hoje },
-      },
-      include: detalhes,
-      orderBy: { data_prevista_devolucao: 'asc' },
     });
   }
 
@@ -197,7 +229,16 @@ export class RentalsRepository {
         valor_total: novoTotal,
         status: StatusAluguel.ATIVO,
       },
-      include: detalhes,
+      include: includeDetalhes,
+    });
+  }
+
+  async contarPagamentosPendentesDoUsuario(id_usuario: number) {
+    return this.prisma.pagamento.count({
+      where: {
+        status: StatusPagamento.PENDENTE,
+        aluguel: { is: { id_usuario } },
+      },
     });
   }
 }
