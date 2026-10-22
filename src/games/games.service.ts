@@ -3,20 +3,16 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import {
-  ListGameCategoriesDto,
-  ListGameRentalsDto,
-  ListGamesDto,
-} from './dto/list-games.dto';
 import { Prisma } from '@prisma/client';
-import { PrismaService } from '../prisma/prisma.service';
+import { GamesRepository } from './games.repository';
 import { CreateGameDto } from './dto/create-game.dto';
 import { UpdateGameDto } from './dto/update-game.dto';
+import { ListGamesDto } from './dto/list-games.dto';
 import { ListGameReviewsDto } from './dto/list-games-reviews.dto';
 
 @Injectable()
 export class GamesService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(private readonly repository: GamesRepository) {}
 
   async create(dto: CreateGameDto) {
     const minJogadores = dto.numero_jogadores_min ?? 1;
@@ -28,20 +24,18 @@ export class GamesService {
       );
     }
 
-    return this.prisma.jogo.create({
-      data: {
-        nome: dto.nome,
-        descricao: dto.descricao,
-        valor_diaria: new Prisma.Decimal(dto.valor_diaria),
-        quantidade_total: dto.quantidade_total,
-        quantidade_disponivel: dto.quantidade_total,
-        ano_lancamento: dto.ano_lancamento,
-        numero_jogadores_min: minJogadores,
-        numero_jogadores_max: maxJogadores,
-        idade_minima: dto.idade_minima ?? 0,
-        duracao_minutos: dto.duracao_minutos ?? 60,
-        complexidade: dto.complexidade ?? 1,
-      },
+    return this.repository.criar({
+      nome: dto.nome,
+      descricao: dto.descricao,
+      valor_diaria: new Prisma.Decimal(dto.valor_diaria),
+      quantidade_total: dto.quantidade_total,
+      quantidade_disponivel: dto.quantidade_total,
+      ano_lancamento: dto.ano_lancamento,
+      numero_jogadores_min: minJogadores,
+      numero_jogadores_max: maxJogadores,
+      idade_minima: dto.idade_minima ?? 0,
+      duracao_minutos: dto.duracao_minutos ?? 60,
+      complexidade: dto.complexidade ?? 1,
     });
   }
 
@@ -50,20 +44,7 @@ export class GamesService {
     page: number,
     limit: number,
   ) {
-    const [data, total] = await this.prisma.$transaction([
-      this.prisma.jogo.findMany({
-        where,
-        orderBy: { nome: 'asc' },
-        skip: (page - 1) * limit,
-        take: limit,
-      }),
-      this.prisma.jogo.count({ where }),
-    ]);
-
-    return {
-      data,
-      meta: { page, limit, total, pages: Math.ceil(total / limit) },
-    };
+    return this.repository.listarPaginado(where, page, limit);
   }
 
   async findAvailable(query: ListGamesDto) {
@@ -108,21 +89,14 @@ export class GamesService {
   }
 
   async findOne(id: number) {
-    const jogo = await this.prisma.jogo.findUnique({ where: { id } });
+    const jogo = await this.repository.buscarPorId(id);
     if (!jogo) throw new NotFoundException('Jogo não encontrado.');
     return jogo;
   }
 
   async findRentals(id: number) {
     await this.findOne(id);
-    return this.prisma.aluguel.findMany({
-      where: { id_jogo: id },
-      include: {
-        usuario: { select: { id: true, nome: true, email: true } },
-        pagamentos: true,
-      },
-      orderBy: { data_aluguel: 'desc' },
-    });
+    return this.repository.buscarAlugueis(id);
   }
 
   async findReviews(id: number, query: ListGameReviewsDto) {
@@ -130,6 +104,7 @@ export class GamesService {
 
     const page = query.page ?? 1;
     const limit = query.limit ?? 10;
+
     const where: Prisma.AvaliacaoWhereInput = {
       id_jogo: id,
       ...(query.nota !== undefined && { nota: query.nota }),
@@ -138,23 +113,7 @@ export class GamesService {
       }),
     };
 
-    const [data, total] = await this.prisma.$transaction([
-      this.prisma.avaliacao.findMany({
-        where,
-        include: {
-          usuario: { select: { id: true, nome: true } },
-        },
-        orderBy: { data_avaliacao: 'desc' },
-        skip: (page - 1) * limit,
-        take: limit,
-      }),
-      this.prisma.avaliacao.count({ where }),
-    ]);
-
-    return {
-      data,
-      meta: { page, limit, total, pages: Math.ceil(total / limit) },
-    };
+    return this.repository.buscarAvaliacoes(where, page, limit);
   }
 
   async findReviewStats(id: number, query: ListGameReviewsDto) {
@@ -168,13 +127,7 @@ export class GamesService {
       }),
     };
 
-    const stats = await this.prisma.avaliacao.aggregate({
-      where,
-      _avg: { nota: true },
-      _max: { nota: true },
-      _min: { nota: true },
-      _count: true,
-    });
+    const stats = await this.repository.buscarEstatisticasAvaliacoes(where);
 
     return {
       media: stats._avg.nota,
@@ -235,63 +188,50 @@ export class GamesService {
       dados.quantidade_total = dto.quantidade_total;
       dados.quantidade_disponivel = dto.quantidade_total - unidadesAlugadas;
 
-      const resultado = await this.prisma.jogo.updateMany({
-        where: {
-          id,
-          quantidade_total: jogo.quantidade_total,
-          quantidade_disponivel: jogo.quantidade_disponivel,
-        },
-        data: dados,
-      });
+      const resultado = await this.repository.atualizarEstoque(
+        id,
+        jogo.quantidade_total,
+        jogo.quantidade_disponivel,
+        dados,
+      );
+
       if (resultado.count !== 1) {
         throw new BadRequestException(
           'O estoque foi alterado durante a atualização. Consulte o jogo e tente novamente.',
         );
       }
-      return this.prisma.jogo.findUniqueOrThrow({ where: { id } });
+
+      return this.repository.buscarPorId(id);
     }
 
-    return this.prisma.jogo.update({ where: { id }, data: dados });
+    return this.repository.atualizar(id, dados);
   }
 
   async deactivate(id: number) {
     await this.findOne(id);
-    return this.prisma.jogo.update({
-      where: { id },
-      data: { ativo: false },
-    });
+    return this.repository.desativar(id);
   }
 
   async activate(id: number) {
     await this.findOne(id);
-    return this.prisma.jogo.update({
-      where: { id },
-      data: { ativo: true },
-    });
+    return this.repository.ativar(id);
   }
 
   async remove(id: number) {
     await this.findOne(id);
 
-    const alugueis = await this.prisma.aluguel.count({
-      where: { id_jogo: id },
-    });
+    const alugueis = await this.repository.contarAlugueis(id);
     if (alugueis > 0) {
       throw new BadRequestException(
         'Não é possível excluir um jogo que possui histórico de aluguéis.',
       );
     }
 
-    return this.prisma.jogo.delete({ where: { id } });
+    return this.repository.excluir(id);
   }
 
-  //Busca um jogo por categoria
   async findCategories(id: number) {
     await this.findOne(id);
-
-    return this.prisma.categoriaJogo.findMany({
-      where: { id_jogo: id },
-      include: { categoria: true },
-    });
+    return this.repository.buscarCategorias(id);
   }
 }

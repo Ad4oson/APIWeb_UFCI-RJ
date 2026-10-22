@@ -2,11 +2,6 @@ import { Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 
-const detalhesAluguel = {
-  usuario: { select: { id: true, nome: true, email: true } },
-  pagamentos: true,
-} satisfies Prisma.AluguelInclude;
-
 @Injectable()
 export class GamesRepository {
   constructor(private readonly prisma: PrismaService) {}
@@ -15,41 +10,88 @@ export class GamesRepository {
     return this.prisma.jogo.create({ data });
   }
 
-  async listar() {
-    return this.prisma.jogo.findMany({
-      orderBy: { nome: 'asc' },
-    });
-  }
+  async listarPaginado(
+    where: Prisma.JogoWhereInput,
+    page: number,
+    limit: number,
+  ) {
+    const [data, total] = await this.prisma.$transaction([
+      this.prisma.jogo.findMany({
+        where,
+        orderBy: { nome: 'asc' },
+        skip: (page - 1) * limit,
+        take: limit,
+      }),
+      this.prisma.jogo.count({ where }),
+    ]);
 
-  async listarDisponiveis() {
-    return this.prisma.jogo.findMany({
-      where: {
-        ativo: true,
-        quantidade_disponivel: { gt: 0 },
+    return {
+      data,
+      meta: {
+        page,
+        limit,
+        total,
+        pages: Math.ceil(total / limit),
       },
-      orderBy: { nome: 'asc' },
-    });
+    };
   }
 
   async buscarPorId(id: number) {
-    return this.prisma.jogo.findUnique({
-      where: { id },
-    });
+    return this.prisma.jogo.findUnique({ where: { id } });
   }
 
   async buscarAlugueis(id: number) {
     return this.prisma.aluguel.findMany({
       where: { id_jogo: id },
-      include: detalhesAluguel,
+      include: {
+        usuario: { select: { id: true, nome: true, email: true } },
+        pagamentos: true,
+      },
       orderBy: { data_aluguel: 'desc' },
     });
   }
 
-  async atualizar(id: number, data: Prisma.JogoUpdateInput) {
-    return this.prisma.jogo.update({
-      where: { id },
+  async buscarAvaliacoes(
+    where: Prisma.AvaliacaoWhereInput,
+    page: number,
+    limit: number,
+  ) {
+    const [data, total] = await this.prisma.$transaction([
+      this.prisma.avaliacao.findMany({
+        where,
+        include: {
+          usuario: { select: { id: true, nome: true } },
+        },
+        orderBy: { data_avaliacao: 'desc' },
+        skip: (page - 1) * limit,
+        take: limit,
+      }),
+      this.prisma.avaliacao.count({ where }),
+    ]);
+
+    return {
       data,
+      meta: {
+        page,
+        limit,
+        total,
+        pages: Math.ceil(total / limit),
+      },
+    };
+  }
+
+  async buscarEstatisticasAvaliacoes(where: Prisma.AvaliacaoWhereInput) {
+    return this.prisma.avaliacao.aggregate({
+      where,
+      _avg: { nota: true },
+      _max: { nota: true },
+      _min: { nota: true },
+      _count: true,
     });
+  }
+
+  async atualizar(id: number, data: Prisma.JogoUpdateInput) {
+    return this.prisma.jogo.update({ where: { id }, data });
   }
 
   async atualizarEstoque(
@@ -89,9 +131,7 @@ export class GamesRepository {
   }
 
   async excluir(id: number) {
-    return this.prisma.jogo.delete({
-      where: { id },
-    });
+    return this.prisma.jogo.delete({ where: { id } });
   }
 
   async buscarCategorias(id: number) {
