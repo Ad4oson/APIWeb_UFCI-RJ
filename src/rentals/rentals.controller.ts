@@ -8,164 +8,97 @@ import {
   Patch,
   Post,
   Query,
-  Req,
   UseGuards,
   UseInterceptors,
 } from '@nestjs/common';
 import { CacheInterceptor } from '@nestjs/cache-manager';
-import {
-  ApiBearerAuth,
-  ApiBody,
-  ApiOperation,
-  ApiParam,
-  ApiResponse,
-  ApiTags,
-} from '@nestjs/swagger';
-import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
-import { RolesGuard } from '../auth/guards/roles.guard';
-import { Roles } from '../auth/decorators/roles.decorator';
+import { ApiBody, ApiOperation, ApiParam, ApiResponse, ApiTags } from '@nestjs/swagger';
+import { AdminGuard } from '../common/guards/admin.guard';
 import { CreateRentalDto } from './dto/create-rental.dto';
 import { ExtendRentalDto } from './dto/extend-rental.dto';
 import { ListRentalsDto } from './dto/list-rentals.dto';
-import { CurrentUser, RentalsService } from './rentals.service';
-
-interface AuthenticatedRequest {
-  user: CurrentUser;
-}
+import { RentalsService } from './rentals.service';
 
 @ApiTags('Aluguéis')
-@ApiBearerAuth()
-@UseGuards(JwtAuthGuard)
 @Controller('rentals')
 export class RentalsController {
   constructor(private readonly rentals: RentalsService) {}
 
-  @Post()
   @ApiOperation({ summary: 'Criar um novo aluguel' })
   @ApiBody({ type: CreateRentalDto })
-  @ApiResponse({
-    status: 201,
-    description: 'Aluguel registrado e estoque do jogo atualizado.',
-  })
-  create(
-    @Body() dto: CreateRentalDto,
-    @Req() request: AuthenticatedRequest,
-  ) {
-    return this.rentals.create(dto, request.user);
+  @ApiResponse({ status: 201, description: 'Aluguel registrado e estoque do jogo atualizado.' })
+  @Post()
+  create(@Body() dto: CreateRentalDto) {
+    return this.rentals.create(dto);
   }
 
+  @ApiOperation({ summary: 'Listar todos os aluguéis' })
+  @ApiResponse({ status: 200, description: 'Lista paginada com os aluguéis do sistema.' })
+  @UseInterceptors(CacheInterceptor)
   @Get()
-  @UseInterceptors(CacheInterceptor)
-  @ApiOperation({ summary: 'Listar aluguéis com filtros e paginação' })
-  @ApiResponse({ status: 200, description: 'Lista paginada de aluguéis.' })
-  findAll(
-    @Query() query: ListRentalsDto,
-    @Req() request: AuthenticatedRequest,
-  ) {
-    return this.rentals.findAll(query, request.user);
+  findAll(@Query() query: ListRentalsDto) {
+    return this.rentals.findAll(query);
   }
 
+  @ApiOperation({ summary: 'Listar apenas aluguéis ativos' })
   @Get('active')
-  @UseInterceptors(CacheInterceptor)
-  @ApiOperation({ summary: 'Listar aluguéis ativos com filtros e paginação' })
-  @ApiResponse({
-    status: 200,
-    description: 'Lista paginada de aluguéis ativos.',
-  })
-  findActive(
-    @Query() query: ListRentalsDto,
-    @Req() request: AuthenticatedRequest,
-  ) {
-    return this.rentals.findActive(query, request.user);
+  findActive() {
+    return this.rentals.findActive();
   }
 
+  @ApiOperation({ summary: 'Listar aluguéis atrasados' })
   @Get('overdue')
-  @UseInterceptors(CacheInterceptor)
-  @ApiOperation({
-    summary: 'Listar aluguéis atrasados com filtros e paginação',
-  })
-  @ApiResponse({
-    status: 200,
-    description: 'Lista paginada de aluguéis atrasados.',
-  })
-  findOverdue(
-    @Query() query: ListRentalsDto,
-    @Req() request: AuthenticatedRequest,
-  ) {
-    return this.rentals.findOverdue(query, request.user);
+  findOverdue() {
+    return this.rentals.findOverdue();
   }
 
-  @Get('user/:userId')
-  @ApiOperation({ summary: 'Listar histórico paginado de um usuário' })
+  @ApiOperation({ summary: 'Ver histórico de um usuário específico' })
   @ApiParam({ name: 'userId', description: 'ID do usuário', type: Number })
-  @ApiResponse({
-    status: 200,
-    description: 'Histórico paginado de aluguéis do usuário.',
-  })
-  findByUser(
-    @Param('userId', ParseIntPipe) userId: number,
-    @Query() query: ListRentalsDto,
-    @Req() request: AuthenticatedRequest,
-  ) {
-    return this.rentals.findByUser(userId, query, request.user);
+  @ApiResponse({ status: 200, description: 'Histórico completo de locações do usuário.' })
+  @Get('user/:userId')
+  findByUser(@Param('userId', ParseIntPipe) userId: number) {
+    return this.rentals.findByUser(userId);
   }
 
+  @ApiOperation({ summary: 'Buscar detalhes de um aluguel pelo ID' })
+  @ApiParam({ name: 'id', description: 'ID do aluguel', type: Number })
+  @ApiResponse({ status: 200, description: 'Dados detalhados do aluguel.' })
   @Get(':id')
-  @ApiOperation({ summary: 'Buscar aluguel pelo ID' })
-  @ApiParam({ name: 'id', description: 'ID do aluguel', type: Number })
-  @ApiResponse({ status: 200, description: 'Detalhes do aluguel.' })
-  findOne(
-    @Param('id', ParseIntPipe) id: number,
-    @Req() request: AuthenticatedRequest,
-  ) {
-    return this.rentals.findOne(id, request.user);
+  findOne(@Param('id', ParseIntPipe) id: number) {
+    return this.rentals.findOne(id);
   }
 
+  @ApiOperation({ summary: 'Registrar a devolução de um jogo' })
+  @ApiParam({ name: 'id', description: 'ID do aluguel', type: Number })
+  @ApiResponse({ status: 200, description: 'Devolução concluída com sucesso.' })
   @Patch(':id/return')
-  @ApiOperation({ summary: 'Registrar devolução de um jogo' })
-  @ApiParam({ name: 'id', description: 'ID do aluguel', type: Number })
-  @ApiResponse({ status: 200, description: 'Devolução registrada.' })
-  returnRental(
-    @Param('id', ParseIntPipe) id: number,
-    @Req() request: AuthenticatedRequest,
-  ) {
-    return this.rentals.returnRental(id, request.user);
+  returnRental(@Param('id', ParseIntPipe) id: number) {
+    return this.rentals.returnRental(id);
   }
 
+  @ApiOperation({ summary: 'Cancelar um aluguel em andamento' })
+  @ApiParam({ name: 'id', description: 'ID do aluguel', type: Number })
+  @ApiResponse({ status: 200, description: 'Aluguel cancelado e jogo devolvido ao estoque.' })
   @Patch(':id/cancel')
-  @ApiOperation({ summary: 'Cancelar um aluguel ativo' })
-  @ApiParam({ name: 'id', description: 'ID do aluguel', type: Number })
-  @ApiResponse({ status: 200, description: 'Aluguel cancelado.' })
-  cancel(
-    @Param('id', ParseIntPipe) id: number,
-    @Req() request: AuthenticatedRequest,
-  ) {
-    return this.rentals.cancel(id, request.user);
+  cancel(@Param('id', ParseIntPipe) id: number) {
+    return this.rentals.cancel(id);
   }
 
-  @Patch(':id/extend')
   @ApiOperation({ summary: 'Prorrogar a data de devolução' })
   @ApiBody({ type: ExtendRentalDto })
   @ApiParam({ name: 'id', description: 'ID do aluguel', type: Number })
-  @ApiResponse({ status: 200, description: 'Prazo do aluguel prorrogado.' })
-  extend(
-    @Param('id', ParseIntPipe) id: number,
-    @Body() dto: ExtendRentalDto,
-    @Req() request: AuthenticatedRequest,
-  ) {
-    return this.rentals.extend(id, dto, request.user);
+  @ApiResponse({ status: 200, description: 'Data de devolução estendida.' })
+  @Patch(':id/extend')
+  extend(@Param('id', ParseIntPipe) id: number, @Body() dto: ExtendRentalDto) {
+    return this.rentals.extend(id, dto);
   }
 
-  @Delete(':id')
-  @UseGuards(RolesGuard)
-  @Roles('ADMIN')
-  @ApiOperation({ summary: 'Excluir um aluguel sem pagamentos associados' })
+  @ApiOperation({ summary: 'Apagar registro de aluguel do banco' })
   @ApiParam({ name: 'id', description: 'ID do aluguel', type: Number })
-  @ApiResponse({ status: 200, description: 'Aluguel excluído.' })
-  remove(
-    @Param('id', ParseIntPipe) id: number,
-    @Req() request: AuthenticatedRequest,
-  ) {
-    return this.rentals.remove(id, request.user);
+  @ApiResponse({ status: 200, description: 'Registro apagado permanentemente.' })
+  @Delete(':id')
+  @UseGuards(AdminGuard)
+  remove(@Param('id', ParseIntPipe) id: number) {
+    return this.rentals.remove(id);
   }
 }

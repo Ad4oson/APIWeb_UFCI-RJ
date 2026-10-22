@@ -7,8 +7,6 @@ import {
   ParseIntPipe,
   Patch,
   Post,
-  UseInterceptors,
-  Query,
 } from '@nestjs/common';
 import { UseGuards } from '@nestjs/common';
 import { Roles } from '../auth/decorators/roles.decorator';
@@ -20,38 +18,27 @@ import { Query } from '@nestjs/common';
 import { ListGameReviewsDto } from '../reviews/dto/list-game-reviews.dto';
 import { RolesGuard } from '../auth/guards/roles.guard';
 
-@ApiTags('Usuários')
 @Controller('users')
 export class UsersController {
   constructor(private readonly users: UsersService) {}
 
   @Post()
-  @ApiBody({ type: CreateUserDto })
-  @ApiOperation({ summary: 'Cadastrar Usuário' })
   create(@Body() dto: CreateUserDto) {
     return this.users.create(dto);
   }
 
   @Get()
-  @UseInterceptors(CacheInterceptor)
-  @ApiOperation({ summary: 'Listar usuários com paginação e filtros' })
-  findAll(@Query() query: ListUsersDto) {
-    return this.users.findAll(query);
+  findAll() {
+    return this.users.findAll();
   }
 
 
   @Get('active')
-  @UseInterceptors(CacheInterceptor)
-  @ApiOperation({
-    summary: 'Listar usuários ativos com paginação e filtro por nome',
-  })
-  findActive(@Query() query: ListUsersDto) {
-    return this.users.findActive(query);
+  findActive() {
+    return this.users.findActive();
   }
 
   @Get(':id/rentals')
-  @UseInterceptors(CacheInterceptor)
-  @ApiOperation({ summary: 'Aluguéis associados ao usuário' })
   findRentals(@Param('id', ParseIntPipe) id: number) {
     return this.users.findRentals(id);
   }
@@ -74,27 +61,21 @@ export class UsersController {
   }
 
   @Get(':id')
-  @ApiOperation({ summary: 'Busca usuário pelo id' })
   findOne(@Param('id', ParseIntPipe) id: number) {
     return this.users.findOne(id);
   }
 
   @Patch(':id')
-  @ApiBody({ type: UpdateUserDto })
-  @ApiParam({ name: 'id', type: Number, description: 'ID do usuário' })
-  @ApiOperation({ summary: 'Atualizar usuário' })
   update(@Param('id', ParseIntPipe) id: number, @Body() dto: UpdateUserDto) {
     return this.users.update(id, dto);
   }
 
   @Patch(':id/deactivate')
-  @ApiOperation({ summary: 'Desativa usuário' })
   deactivate(@Param('id', ParseIntPipe) id: number) {
     return this.users.deactivate(id);
   }
 
   @Patch(':id/activate')
-  @ApiOperation({ summary: 'Reativa usuário' })
   activate(@Param('id', ParseIntPipe) id: number) {
     return this.users.activate(id);
   }
