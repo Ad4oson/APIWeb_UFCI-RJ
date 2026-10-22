@@ -7,56 +7,51 @@ import {
   ParseIntPipe,
   Patch,
   Post,
-  UseInterceptors,
   Query,
+  UseGuards,
 } from '@nestjs/common';
-import { ApiBody, ApiOperation, ApiTags } from '@nestjs/swagger';
-import { CacheInterceptor } from '@nestjs/cache-manager';
+import { ApiBearerAuth, ApiBody, ApiOperation, ApiParam, ApiTags } from '@nestjs/swagger';
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CreateGameDto } from './dto/create-game.dto';
 import { UpdateGameDto } from './dto/update-game.dto';
+import { ListGamesDto } from './dto/list-games.dto';
 import { GamesService } from './games.service';
-import { ListGameReviewsDto } from './dto/list-games-reviews.dto';
-import {
-  ListGameCategoriesDto,
-  ListGameRentalsDto,
-  ListGamesDto,
-} from './dto/list-games.dto';
+import { ListGameReviewsDto } from '../reviews/dto/list-game-reviews.dto';
 
 @ApiTags('Jogos')
+@ApiBearerAuth()
+@UseGuards(JwtAuthGuard)
 @Controller('games')
 export class GamesController {
   constructor(private readonly games: GamesService) {}
 
   @Post()
-  @ApiOperation({ summary: 'Criar jogo' })
+  @ApiOperation({ summary: 'Cadastrar jogo' })
   @ApiBody({ type: CreateGameDto })
   create(@Body() dto: CreateGameDto) {
     return this.games.create(dto);
   }
 
   @Get()
-  @UseInterceptors(CacheInterceptor)
   @ApiOperation({ summary: 'Listar jogos' })
   findAll(@Query() query: ListGamesDto) {
     return this.games.findAll(query);
   }
 
   @Get('available')
-  @UseInterceptors(CacheInterceptor)
   @ApiOperation({ summary: 'Listar jogos disponíveis' })
   findAvailable(@Query() query: ListGamesDto) {
     return this.games.findAvailable(query);
   }
 
   @Get(':id/rentals')
-  @UseInterceptors(CacheInterceptor)
-  @ApiOperation({ summary: 'Listar aluguéis associados ao jogo' })
+  @ApiOperation({ summary: 'Listar aluguéis de um jogo' })
   findRentals(@Param('id', ParseIntPipe) id: number) {
     return this.games.findRentals(id);
   }
 
   @Get(':id')
-  @ApiOperation({ summary: 'Busca por Id' })
+  @ApiOperation({ summary: 'Buscar jogo por ID' })
   findOne(@Param('id', ParseIntPipe) id: number) {
     return this.games.findOne(id);
   }
@@ -64,32 +59,34 @@ export class GamesController {
   @Patch(':id')
   @ApiOperation({ summary: 'Atualizar jogo' })
   @ApiBody({ type: UpdateGameDto })
-  update(@Param('id', ParseIntPipe) id: number, @Body() dto: UpdateGameDto) {
+  @ApiParam({ name: 'id', type: Number, description: 'ID do jogo' })
+  update(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: UpdateGameDto,
+  ) {
     return this.games.update(id, dto);
   }
 
   @Patch(':id/deactivate')
-  @ApiOperation({ summary: 'Desativa jogo' })
+  @ApiOperation({ summary: 'Desativar jogo' })
   deactivate(@Param('id', ParseIntPipe) id: number) {
     return this.games.deactivate(id);
   }
 
   @Patch(':id/activate')
-  @ApiOperation({ summary: 'Reativa jogo' })
+  @ApiOperation({ summary: 'Ativar jogo' })
   activate(@Param('id', ParseIntPipe) id: number) {
     return this.games.activate(id);
   }
 
-  //Busca um jogo pela categoria
   @Get(':id/categories')
-  @UseInterceptors(CacheInterceptor)
-  @ApiOperation({ summary: 'Listar categorias do jogo' })
+  @ApiOperation({ summary: 'Listar categorias de um jogo' })
   findCategories(@Param('id', ParseIntPipe) id: number) {
     return this.games.findCategories(id);
   }
 
   @Get(':id/reviews')
-  @ApiOperation({ summary: 'Listar avaliações do jogo' })
+  @ApiOperation({ summary: 'Listar avaliações de um jogo' })
   findReviews(
     @Param('id', ParseIntPipe) id: number,
     @Query() query: ListGameReviewsDto,
@@ -107,7 +104,7 @@ export class GamesController {
   }
 
   @Delete(':id')
-  @ApiOperation({ summary: 'Deleta jogo' })
+  @ApiOperation({ summary: 'Excluir jogo' })
   remove(@Param('id', ParseIntPipe) id: number) {
     return this.games.remove(id);
   }

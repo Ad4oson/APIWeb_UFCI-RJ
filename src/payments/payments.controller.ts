@@ -10,7 +10,13 @@ import {
   Query,
   UseGuards,
 } from '@nestjs/common';
-import { ApiOperation, ApiParam, ApiResponse, ApiTags } from '@nestjs/swagger';
+import {
+  ApiBearerAuth,
+  ApiOperation,
+  ApiParam,
+  ApiResponse,
+  ApiTags,
+} from '@nestjs/swagger';
 import { AdminGuard } from '../common/guards/admin.guard';
 import { CreatePaymentDto } from './dto/create-payment.dto';
 import { ListPaymentsDto } from './dto/list-payments.dto';
@@ -20,6 +26,8 @@ import { RolesGuard } from '../auth/guards/roles.guard';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 
 @ApiTags('Pagamentos')
+@ApiBearerAuth()
+@UseGuards(JwtAuthGuard)
 @Controller('payments')
 export class PaymentsController {
   constructor(private readonly payments: PaymentsService) {}
@@ -51,7 +59,11 @@ export class PaymentsController {
   }
 
   @ApiOperation({ summary: 'Buscar pagamentos por aluguel' })
-  @ApiParam({ name: 'rentalId', description: 'ID numérico do aluguel', type: Number })
+  @ApiParam({
+    name: 'rentalId',
+    description: 'ID numérico do aluguel',
+    type: Number,
+  })
   @ApiResponse({ status: 200, description: 'Faturas vinculadas ao aluguel.' })
   @Get('rental/:rentalId')
   findByRental(@Param('rentalId', ParseIntPipe) rentalId: number) {
@@ -59,7 +71,11 @@ export class PaymentsController {
   }
 
   @ApiOperation({ summary: 'Buscar pagamento por ID' })
-  @ApiParam({ name: 'id', description: 'ID numérico do pagamento', type: Number })
+  @ApiParam({
+    name: 'id',
+    description: 'ID numérico do pagamento',
+    type: Number,
+  })
   @ApiResponse({ status: 200, description: 'Detalhes da transação.' })
   @Get(':id')
   findOne(@Param('id', ParseIntPipe) id: number) {
@@ -67,7 +83,11 @@ export class PaymentsController {
   }
 
   @ApiOperation({ summary: 'Calcular multa de atraso' })
-  @ApiParam({ name: 'rentalId', description: 'ID numérico do aluguel', type: Number })
+  @ApiParam({
+    name: 'rentalId',
+    description: 'ID numérico do aluguel',
+    type: Number,
+  })
   @ApiResponse({ status: 201, description: 'Cálculo de multa gerado.' })
   @Post('calculate-fine/:rentalId')
   calculateFine(@Param('rentalId', ParseIntPipe) rentalId: number) {
@@ -75,7 +95,11 @@ export class PaymentsController {
   }
 
   @ApiOperation({ summary: 'Confirmar compensação' })
-  @ApiParam({ name: 'id', description: 'ID numérico do pagamento', type: Number })
+  @ApiParam({
+    name: 'id',
+    description: 'ID numérico do pagamento',
+    type: Number,
+  })
   @ApiResponse({ status: 200, description: 'Transação confirmada.' })
   @Patch(':id/confirm')
   confirm(@Param('id', ParseIntPipe) id: number) {
@@ -83,7 +107,11 @@ export class PaymentsController {
   }
 
   @ApiOperation({ summary: 'Solicitar estorno' })
-  @ApiParam({ name: 'id', description: 'ID numérico do pagamento', type: Number })
+  @ApiParam({
+    name: 'id',
+    description: 'ID numérico do pagamento',
+    type: Number,
+  })
   @ApiResponse({ status: 200, description: 'Estorno processado.' })
   @Patch(':id/refund')
   refund(@Param('id', ParseIntPipe) id: number) {
@@ -91,13 +119,17 @@ export class PaymentsController {
   }
 
   @ApiOperation({ summary: 'Excluir registro de pagamento' })
-  @ApiParam({ name: 'id', description: 'ID numérico do pagamento', type: Number })
-  @ApiResponse({ status: 200, description: 'Registro apagado permanentemente.' })
+  @ApiParam({
+    name: 'id',
+    description: 'ID numérico do pagamento',
+    type: Number,
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Registro apagado permanentemente.',
+  })
   @Delete(':id')
-  @UseGuards(
-    JwtAuthGuard,
-    RolesGuard,
-  )
+  @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('ADMIN')
   remove(@Param('id', ParseIntPipe) id: number) {
     return this.payments.remove(id);

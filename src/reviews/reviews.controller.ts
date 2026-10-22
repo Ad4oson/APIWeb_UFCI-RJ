@@ -1,128 +1,122 @@
 import {
-    Body,
-    Controller,
-    Delete,
-    Get,
-    Param,
-    ParseIntPipe,
-    Patch,
-    Post,
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  ParseIntPipe,
+  Patch,
+  Post,
+  UseGuards,
 } from '@nestjs/common';
+import { ApiBearerAuth } from '@nestjs/swagger';
 import { CreateReviewDto } from './dto/create-review.dto';
 import { UpdateReviewDto } from './dto/update-review.dto';
 import { ReviewsService } from './reviews.service';
-import { Query } from '@nestjs/common'
+import { Query } from '@nestjs/common';
 import { ApiOperation, ApiParam, ApiResponse, ApiTags } from '@nestjs/swagger';
-import { ListReviewsDto } from './dto/list-reviews.dto'; 
+import { ListReviewsDto } from './dto/list-reviews.dto';
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 
 @ApiTags('Avaliações')
+@ApiBearerAuth()
+@UseGuards(JwtAuthGuard)
 @Controller('reviews')
 export class ReviewsController {
-    constructor(
-        private readonly reviews: ReviewsService,
-    ) {}
+  constructor(private readonly reviews: ReviewsService) {}
 
-    //Cria uma avaliação para um jogo
-    @ApiOperation({
-        summary: 'Criar uma avaliação',
-    })
-    @ApiResponse({
-        status: 201,
-        description: 'Avaliação criada com sucesso',
-    })
-    @ApiResponse({
-        status: 404,
-        description: 'Usuário ou jogo não encontrado',
-    })
-    @Post()
-    create(
-        @Body() dto: CreateReviewDto,
-    ) {
-        return this.reviews.create(dto);
-    }
+  //Cria uma avaliação para um jogo
+  @ApiOperation({
+    summary: 'Criar uma avaliação',
+  })
+  @ApiResponse({
+    status: 201,
+    description: 'Avaliação criada com sucesso',
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'Usuário ou jogo não encontrado',
+  })
+  @Post()
+  create(@Body() dto: CreateReviewDto) {
+    return this.reviews.create(dto);
+  }
 
-    @ApiOperation({
-        summary: 'Listar avaliações',
-    })
-    @ApiResponse({
-        status: 200,
-        description: 'Lista paginada de avaliações',
-    })
-    @Get()
-    findAll(@Query() query: ListReviewsDto){
-        return this.reviews.findAll(query);
-    }
+  @ApiOperation({
+    summary: 'Listar avaliações',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Lista paginada de avaliações',
+  })
+  @Get()
+  findAll(@Query() query: ListReviewsDto) {
+    return this.reviews.findAll(query);
+  }
 
-    //Busca uma avaliação pelo identificador
-    @ApiOperation({
-        summary: 'Buscar avaliação por ID',
-    })
-    @ApiParam({
-        name: 'id',
-        description: 'ID da avaliação',
-        type: Number,
-    })
-    @ApiResponse({
-        status: 200,
-        description: 'Avaliação Encontrada',
-    })
-    @ApiResponse({
-        status: 404,
-        description: 'Avaliação não encontrada',
-    })
-    @Get(':id')
-    findOne(
-        @Param('id', ParseIntPipe) id: number,
-    ) {
-        return this.reviews.findOne(id);
-    }
+  //Busca uma avaliação pelo identificador
+  @ApiOperation({
+    summary: 'Buscar avaliação por ID',
+  })
+  @ApiParam({
+    name: 'id',
+    description: 'ID da avaliação',
+    type: Number,
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Avaliação Encontrada',
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'Avaliação não encontrada',
+  })
+  @Get(':id')
+  findOne(@Param('id', ParseIntPipe) id: number) {
+    return this.reviews.findOne(id);
+  }
 
-    //Atualiza notas e comentários da avaliação
-    @ApiOperation({
-        summary: 'Atualizar avaliação',
-    })
-    @ApiParam({
-        name: 'id',
-        description: 'ID da avaliação',
-        type: Number,
-    })
-    @ApiResponse({
-        status: 200,
-        description: 'Avaliação atualizada com sucesso',
-    })
-    @ApiResponse({
-        status: 404,
-        description: 'Avaliação não encontrada',
-    })
-    @Patch(':id')
-    update(
-        @Param('id', ParseIntPipe) id: number,
-        @Body() dto: UpdateReviewDto,
-    ) {
-        return this.reviews.update(id, dto);
-    }
+  //Atualiza notas e comentários da avaliação
+  @ApiOperation({
+    summary: 'Atualizar avaliação',
+  })
+  @ApiParam({
+    name: 'id',
+    description: 'ID da avaliação',
+    type: Number,
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Avaliação atualizada com sucesso',
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'Avaliação não encontrada',
+  })
+  @Patch(':id')
+  update(@Param('id', ParseIntPipe) id: number, @Body() dto: UpdateReviewDto) {
+    return this.reviews.update(id, dto);
+  }
 
-    //Remove uma avaliação já feita
-    @ApiOperation({
-        summary: 'Excluir avaliação',
-    })
-    @ApiParam({
-        name: 'id',
-        description: 'ID da avaliação',
-        type: Number,
-    })
-    @ApiResponse({
-        status: 200,
-        description: 'Avaliação removida com sucesso',
-    })
-    @ApiResponse({
-        status: 404,
-        description: 'Avaliação não encontrada',
-    })
-    @Delete(':id')
-    remove(
-        @Param('id', ParseIntPipe) id: number,
-    ) {
-        return this.reviews.remove(id);
-    }
+  //Remove uma avaliação já feita
+  @ApiOperation({
+    summary: 'Excluir avaliação',
+  })
+  @ApiParam({
+    name: 'id',
+    description: 'ID da avaliação',
+    type: Number,
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Avaliação removida com sucesso',
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'Avaliação não encontrada',
+  })
+  @Delete(':id')
+  remove(@Param('id', ParseIntPipe) id: number) {
+    return this.reviews.remove(id);
+  }
 }
