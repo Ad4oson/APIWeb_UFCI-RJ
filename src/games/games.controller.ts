@@ -7,11 +7,12 @@ import {
   ParseIntPipe,
   Patch,
   Post,
+  Query,
 } from '@nestjs/common';
 import { CreateGameDto } from './dto/create-game.dto';
+import { ListGamesDto } from './dto/list-games.dto';
 import { UpdateGameDto } from './dto/update-game.dto';
 import { GamesService } from './games.service';
-import { Query } from '@nestjs/common';
 import { ListGameReviewsDto } from '../reviews/dto/list-game-reviews.dto';
 
 @Controller('games')
@@ -26,14 +27,14 @@ export class GamesController {
 
   /** Lista todos os jogos cadastrados. */
   @Get()
-  findAll() {
-    return this.games.findAll();
+  findAll(@Query() query: ListGamesDto) {
+    return this.games.findAll(query);
   }
 
   /** Lista jogos ativos que ainda têm unidades disponíveis para aluguel. */
   @Get('available')
-  findAvailable() {
-    return this.games.findAvailable();
+  findAvailable(@Query() query: ListGamesDto) {
+    return this.games.findAvailable(query);
   }
 
   /** Retorna os aluguéis associados ao jogo. */
