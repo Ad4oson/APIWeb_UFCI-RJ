@@ -8,7 +8,7 @@ import { GamesRepository } from './games.repository';
 import { CreateGameDto } from './dto/create-game.dto';
 import { UpdateGameDto } from './dto/update-game.dto';
 import { ListGamesDto } from './dto/list-games.dto';
-import { ListGameReviewsDto } from '../reviews/dto/list-game-reviews.dto';
+import { ListGameReviewsDto } from './dto/list-games-reviews.dto';
 
 @Injectable()
 export class GamesService {
