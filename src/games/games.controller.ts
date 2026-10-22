@@ -14,7 +14,9 @@ import { ListGamesDto } from './dto/list-games.dto';
 import { UpdateGameDto } from './dto/update-game.dto';
 import { GamesService } from './games.service';
 import { ListGameReviewsDto } from '../reviews/dto/list-game-reviews.dto';
+import { ApiTags } from '@nestjs/swagger';
 
+@ApiTags('Jogos')
 @Controller('games')
 export class GamesController {
   constructor(private readonly games: GamesService) {}
@@ -69,9 +71,7 @@ export class GamesController {
 
   //Busca um jogo pela categoria
   @Get(':id/categories')
-  findCategories(
-    @Param('id', ParseIntPipe) id: number,
-  ) {
+  findCategories(@Param('id', ParseIntPipe) id: number) {
     return this.games.findCategories(id);
   }
 
@@ -90,7 +90,7 @@ export class GamesController {
   ) {
     return this.games.findReviewStats(id, query);
   }
-  
+
   /** Exclui um jogo que não possua histórico de aluguéis. */
   @Delete(':id')
   remove(@Param('id', ParseIntPipe) id: number) {

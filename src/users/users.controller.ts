@@ -17,7 +17,9 @@ import { UsersService } from './users.service';
 import { Query } from '@nestjs/common';
 import { ListGameReviewsDto } from '../reviews/dto/list-game-reviews.dto';
 import { RolesGuard } from '../auth/guards/roles.guard';
+import { ApiTags } from '@nestjs/swagger';
 
+@ApiTags('Usuários')
 @Controller('users')
 export class UsersController {
   constructor(private readonly users: UsersService) {}
@@ -32,7 +34,6 @@ export class UsersController {
     return this.users.findAll();
   }
 
-
   @Get('active')
   findActive() {
     return this.users.findActive();
@@ -42,7 +43,6 @@ export class UsersController {
   findRentals(@Param('id', ParseIntPipe) id: number) {
     return this.users.findRentals(id);
   }
-
 
   @Get(':id/reviews')
   findReviews(
@@ -81,10 +81,7 @@ export class UsersController {
   }
 
   @Delete(':id')
-  @UseGuards(
-    JwtAuthGuard,
-    RolesGuard,
-  )
+  @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('ADMIN')
   remove(@Param('id', ParseIntPipe) id: number) {
     return this.users.remove(id);

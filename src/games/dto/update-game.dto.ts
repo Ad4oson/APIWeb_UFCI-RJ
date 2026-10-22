@@ -13,10 +13,8 @@ import {
 } from 'class-validator';
 
 export class UpdateGameDto {
-  @Transform(({ value }) =>
-    typeof value === 'string' ? value.trim() : value,
-  )
-  @ValidateIf((_obj, value) => value !== undefined)
+  @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
+  @IsOptional()
   @IsString()
   @MinLength(1)
   @MaxLength(150)
@@ -28,13 +26,13 @@ export class UpdateGameDto {
   descricao?: string | null;
 
   @Type(() => Number)
-  @ValidateIf((_obj, value) => value !== undefined)
+  @IsOptional()
   @IsNumber({ maxDecimalPlaces: 2 })
   @Min(0.01)
   valor_diaria?: number;
 
   @Type(() => Number)
-  @ValidateIf((_obj, value) => value !== undefined)
+  @IsOptional()
   @IsInt()
   @Min(1)
   quantidade_total?: number;
@@ -42,42 +40,42 @@ export class UpdateGameDto {
   @Type(() => Number)
   @IsOptional()
   @IsInt()
-  @Min(1901)
-  @Max(2155)
+  @Min(1900)
+  @Max(new Date().getFullYear())
   ano_lancamento?: number | null;
 
   @Type(() => Number)
-  @ValidateIf((_obj, value) => value !== undefined)
+  @IsOptional()
   @IsInt()
   @Min(1)
   numero_jogadores_min?: number;
 
   @Type(() => Number)
-  @ValidateIf((_obj, value) => value !== undefined)
+  @IsOptional()
   @IsInt()
   @Min(1)
   numero_jogadores_max?: number;
 
   @Type(() => Number)
-  @ValidateIf((_obj, value) => value !== undefined)
+  @IsOptional()
   @IsInt()
   @Min(0)
   idade_minima?: number;
 
   @Type(() => Number)
-  @ValidateIf((_obj, value) => value !== undefined)
+  @IsOptional()
   @IsInt()
   @Min(1)
   duracao_minutos?: number;
 
   @Type(() => Number)
-  @ValidateIf((_obj, value) => value !== undefined)
+  @IsOptional()
   @IsInt()
   @Min(1)
   @Max(5)
   complexidade?: number;
 
-  @ValidateIf((_obj, value) => value !== undefined)
+  @IsOptional()
   @IsBoolean()
   ativo?: boolean;
 }

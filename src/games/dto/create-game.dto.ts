@@ -11,9 +11,7 @@ import {
 } from 'class-validator';
 
 export class CreateGameDto {
-  @Transform(({ value }) =>
-    typeof value === 'string' ? value.trim() : value,
-  )
+  @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
   @IsString()
   @MinLength(1)
   @MaxLength(150)
@@ -37,8 +35,8 @@ export class CreateGameDto {
   @Type(() => Number)
   @IsOptional()
   @IsInt()
-  @Min(1901)
-  @Max(2155)
+  @Min(1900)
+  @Max(new Date().getFullYear())
   ano_lancamento?: number | null;
 
   @Type(() => Number)
