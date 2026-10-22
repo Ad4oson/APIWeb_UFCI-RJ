@@ -8,8 +8,9 @@ import { randomBytes, scryptSync } from 'node:crypto';
 import { UsersRepository } from './users.repository';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
-import { Prisma } from '@prisma/client';
-import { ListUsersDto } from './dto/list-user.dto';
+import { PrismaService } from '../prisma/prisma.service';
+import { ListGameReviewsDto } from '../reviews/dto/list-game-reviews.dto';
+
 
 function gerarHashSenha(senha: string): string {
   const salt = randomBytes(16).toString('hex');
@@ -19,7 +20,10 @@ function gerarHashSenha(senha: string): string {
 
 @Injectable()
 export class UsersService {
-  constructor(private readonly repository: UsersRepository) {}
+  constructor(
+    private readonly repository: UsersRepository,
+    private readonly prisma: PrismaService
+  ) {}
 
   async create(dto: CreateUserDto) {
     const jaExiste = await this.repository.buscarPorEmail(dto.email);
@@ -27,28 +31,22 @@ export class UsersService {
       throw new ConflictException('Este e-mail já está cadastrado.');
     }
 
-    const cpfExistente = await this.repository.buscarPorCpf(dto.cpf);
-    if (cpfExistente) {
-      throw new ConflictException('Este CPF já está cadastrado.');
-    }
-
     const dadosNovoUsuario = {
       nome: dto.nome,
       email: dto.email,
       senha: gerarHashSenha(dto.senha),
       telefone: dto.telefone,
-      cpf: dto.cpf,
     };
 
     return this.repository.criar(dadosNovoUsuario);
   }
 
-  findAll(query: ListUsersDto) {
-    return this.repository.buscarPaginado(query);
+  findAll() {
+    return this.repository.buscarTodos();
   }
 
-  findActive(query: ListUsersDto) {
-    return this.repository.buscarPaginado(query, true);
+  findActive() {
+    return this.repository.buscarAtivos();
   }
 
   async findOne(id: number) {
@@ -64,6 +62,76 @@ export class UsersService {
     return this.repository.buscarAlugueisDoUsuario(id);
   }
 
+  async findReviews(
+    id: number,
+    query: ListGameReviewsDto
+  ) {
+    await this.findOne(id);
+
+    const page = query.page ?? 1;
+    const limit = query.limit ?? 10;
+
+    const where: any = {
+      id_usuario: id,
+    };
+
+    if(query.nota){
+      where.nota = query.nota;
+    }
+
+    const [data, total] = await Promise.all([
+      this.prisma.avaliacao.findMany({
+        where,
+        include: {
+          jogo: true,
+        },
+        skip: (page - 1) * limit,
+        take: limit,
+      }),
+      this.prisma.avaliacao.count({
+        where,
+      }),
+    ]);
+
+    return {
+      data,
+      meta: {
+        page,
+        limit,
+        total,
+        pages: Math.ceil(total / limit),
+      },
+    };
+  }
+
+  async findReviewStats(
+    id: number,
+    query: ListGameReviewsDto
+  ) {
+    await this.findOne(id);
+
+    const where: any = {
+      id_usuario: id,
+    };
+
+    if(query.nota) {
+      where.nota = query.nota;
+    }
+
+    const stats = await this.prisma.avaliacao.aggregate({
+      where,
+      _avg: {
+        nota: true,
+      },
+      _count: true,
+    });
+
+    return {
+      media: stats._avg.nota,
+      totalAvaliacoes: stats._count,
+    };
+  }
+
   async update(id: number, dto: UpdateUserDto) {
     await this.findOne(id);
 
@@ -72,14 +140,6 @@ export class UsersService {
       const checkEmail = await this.repository.buscarPorEmail(dto.email);
       if (checkEmail && checkEmail.id !== id) {
         throw new ConflictException('Este e-mail já está cadastrado.');
-      }
-    }
-
-    if (dto.cpf !== undefined) {
-      const cpfExistente = await this.repository.buscarPorCpf(dto.cpf);
-
-      if (cpfExistente && cpfExistente.id !== id) {
-        throw new ConflictException('Este CPF já está cadastrado.');
       }
     }
 

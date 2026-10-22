@@ -1,20 +1,15 @@
 import {
-  Body,
-  Controller,
-  Delete,
-  Get,
-  Param,
-  ParseIntPipe,
-  Patch,
-  Post,
-  Query,
-  UseInterceptors,
+    Body,
+    Controller,
+    Delete,
+    Get,
+    Param,
+    ParseIntPipe,
+    Patch,
+    Post,
 } from '@nestjs/common';
-import { ApiBody, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
-import { CacheInterceptor } from '@nestjs/cache-manager';
 import { CreateReviewDto } from './dto/create-review.dto';
 import { UpdateReviewDto } from './dto/update-review.dto';
-import { ListReviewsDto } from './dto/list-reviews.dto';
 import { ReviewsService } from './reviews.service';
 import { Query } from '@nestjs/common'
 import { ApiOperation, ApiParam, ApiResponse, ApiTags } from '@nestjs/swagger';
@@ -23,7 +18,9 @@ import { ListReviewsDto } from './dto/list-reviews.dto';
 @ApiTags('Avaliações')
 @Controller('reviews')
 export class ReviewsController {
-  constructor(private readonly reviews: ReviewsService) {}
+    constructor(
+        private readonly reviews: ReviewsService,
+    ) {}
 
     //Cria uma avaliação para um jogo
     @ApiOperation({
@@ -44,18 +41,17 @@ export class ReviewsController {
         return this.reviews.create(dto);
     }
 
-  @ApiOperation({
-    summary: 'Listar avaliações',
-  })
-  @ApiResponse({
-    status: 200,
-    description: 'Lista paginada de avaliações',
-  })
-  @UseInterceptors(CacheInterceptor)
-  @Get()
-  findAll(@Query() query: ListReviewsDto) {
-    return this.reviews.findAll(query);
-  }
+    @ApiOperation({
+        summary: 'Listar avaliações',
+    })
+    @ApiResponse({
+        status: 200,
+        description: 'Lista paginada de avaliações',
+    })
+    @Get()
+    findAll(@Query() query: ListReviewsDto){
+        return this.reviews.findAll(query);
+    }
 
     //Busca uma avaliação pelo identificador
     @ApiOperation({

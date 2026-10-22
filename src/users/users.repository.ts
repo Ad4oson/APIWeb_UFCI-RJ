@@ -1,7 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { Prisma, StatusAluguel } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
-import { ListUsersDto } from './dto/list-user.dto';
 
 const dadosPublicosUsuario = {
   id: true,
@@ -24,6 +23,20 @@ export class UsersRepository {
     });
   }
 
+  async buscarCredenciaisPorEmail(email: string) {
+    return this.prisma.usuario.findUnique({
+      where: {email},
+      select: {
+        id: true,
+        nome: true,
+        email: true,
+        senha: true,
+        role: true,
+        ativo: true,
+      },
+    });
+  }
+
   async criar(data: any) {
     return this.prisma.usuario.create({
       data,
@@ -31,42 +44,19 @@ export class UsersRepository {
     });
   }
 
-  async buscarPaginado(query: ListUsersDto, somenteAtivos = false) {
-    const page = query.page ?? 1;
-    const limit = query.limit ?? 10;
+  async buscarTodos() {
+    return this.prisma.usuario.findMany({
+      select: dadosPublicosUsuario,
+      orderBy: { nome: 'asc' },
+    });
+  }
 
-    const where: Prisma.UsuarioWhereInput = {};
-
-    if (query.nome?.trim()) {
-      where.nome = { contains: query.nome.trim() };
-    }
-
-    if (somenteAtivos) {
-      where.ativo = true;
-    } else if (query.ativo !== undefined) {
-      where.ativo = query.ativo;
-    }
-
-    const [data, total] = await Promise.all([
-      this.prisma.usuario.findMany({
-        where,
-        select: dadosPublicosUsuario,
-        orderBy: { nome: 'asc' },
-        skip: (page - 1) * limit,
-        take: limit,
-      }),
-      this.prisma.usuario.count({ where }),
-    ]);
-
-    return {
-      data,
-      meta: {
-        page,
-        limit,
-        total,
-        pages: Math.ceil(total / limit),
-      },
-    };
+  async buscarAtivos() {
+    return this.prisma.usuario.findMany({
+      where: { ativo: true },
+      select: dadosPublicosUsuario,
+      orderBy: { nome: 'asc' },
+    });
   }
 
   async buscarPorId(id: number) {
@@ -84,32 +74,11 @@ export class UsersRepository {
     });
   }
 
-  async buscarPorCpf(cpf: string) {
-    return this.prisma.usuario.findUnique({
-      where: { cpf },
-      select: { id: true },
-    });
-  }
-
   async atualizar(id: number, data: any) {
     return this.prisma.usuario.update({
       where: { id },
       data,
       select: dadosPublicosUsuario,
-    });
-  }
-
-  async buscarCredenciaisPorEmail(email: string) {
-    return this.prisma.usuario.findUnique({
-      where: { email },
-      select: {
-        id: true,
-        nome: true,
-        email: true,
-        senha: true,
-        role: true,
-        ativo: true,
-      },
     });
   }
 
