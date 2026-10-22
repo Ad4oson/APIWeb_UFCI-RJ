@@ -9,10 +9,10 @@ import { AuthService } from './auth.service';
 import { LoginDto } from './dto/login.dto';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 
-@ApiTags('Autenticação')
-@Controller('auth')
-export class AuhtController {
-  constructor(private readonly authService: AuthService) {}
+ @ApiTags('Autenticação')
+ @Controller('auth')
+ export class AuthController {
+    constructor(private readonly authService: AuthService) {}
 
   @ApiOperation({
     summary: 'Realizar login',
@@ -36,13 +36,39 @@ export class AuhtController {
     return this.authService.me(req.user.id);
   }
 
-  @ApiBearerAuth()
-  @ApiOperation({
-    summary: 'Valida o token JWT',
-  })
-  @UseGuards(JwtAuthGuard)
-  @Get('validate')
-  validate(@Req() req: any) {
-    return this.authService.validate(req.user.id);
-  }
-}
+    @ApiBearerAuth()
+    @ApiOperation({
+        summary: 'Retorna dados do usuário autenticado'
+    })
+    @ApiResponse({
+        status: 200,
+        description: 'Usuário autenticado',
+    })
+    @ApiResponse({
+        status: 401,
+        description: 'Não autorizado',
+    })
+    @UseGuards(JwtAuthGuard)
+    @Get('me')
+    me(@Req() req: any) {
+        return this.authService.me(req.user.id);
+    }
+
+    @ApiBearerAuth()
+    @ApiOperation({
+        summary: 'Valida o token JWT'
+    })
+    @ApiResponse({
+        status: 200,
+        description: 'Token inválido',
+    })
+    @ApiResponse({
+        status: 401,
+        description: 'Não autorizado',
+    })
+    @UseGuards(JwtAuthGuard)
+    @Get('validate')
+    validate(@Req() req: any){
+        return this.authService.validate(req.user.id);
+    }
+ }

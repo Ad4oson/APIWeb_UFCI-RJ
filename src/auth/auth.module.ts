@@ -1,13 +1,13 @@
 import { Module } from '@nestjs/common';
 import { JwtModule } from '@nestjs/jwt';
-import { AuhtController } from './auth.controller';
+import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
 import { JwtStrategy } from './strategies/jwt.strategy';
-import { UsersRepository } from '../users/users.repository';
-import { PrismaService } from '../prisma/prisma.service';
+import { UsersModule } from '../users/users.module';
 
 @Module({
     imports: [
+        UsersModule,
         JwtModule.register({
             secret: process.env.JWT_SECRET ?? 'apiweb-ufci-rj-secret',
 
@@ -18,13 +18,11 @@ import { PrismaService } from '../prisma/prisma.service';
     ],
 
     controllers: [
-        AuhtController,
+        AuthController,
     ],
     providers: [
         AuthService,
         JwtStrategy,
-        UsersRepository,
-        PrismaService,
     ],
 
     exports: [

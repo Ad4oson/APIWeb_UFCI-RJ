@@ -26,11 +26,10 @@ import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { CreatePaymentDto } from './dto/create-payment.dto';
 import { ListPaymentsDto } from './dto/list-payments.dto';
-import { CurrentPaymentUser, PaymentsService } from './payments.service';
-
-interface AuthenticatedRequest {
-  user: CurrentPaymentUser;
-}
+import { PaymentsService } from './payments.service';
+import { Roles } from '../auth/decorators/roles.decorator';
+import { RolesGuard } from '../auth/guards/roles.guard';
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 
 @ApiTags('Pagamentos')
 @ApiBearerAuth()
@@ -173,19 +172,12 @@ export class PaymentsController {
   }
 
   @Delete(':id')
-  @UseGuards(RolesGuard)
+  @UseGuards(
+    JwtAuthGuard,
+    RolesGuard,
+  )
   @Roles('ADMIN')
-  @ApiOperation({ summary: 'Excluir pagamento como administrador' })
-  @ApiParam({
-    name: 'id',
-    description: 'ID numérico do pagamento',
-    type: Number,
-  })
-  @ApiResponse({ status: 200, description: 'Pagamento excluído.' })
-  remove(
-    @Param('id', ParseIntPipe) id: number,
-    @Req() request: AuthenticatedRequest,
-  ) {
-    return this.payments.remove(id, request.user);
+  remove(@Param('id', ParseIntPipe) id: number) {
+    return this.payments.remove(id);
   }
 }
