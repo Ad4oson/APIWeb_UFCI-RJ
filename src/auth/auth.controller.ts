@@ -1,40 +1,40 @@
-import { Controller, Get, Post, Body, Req, UseGuards } from '@nestjs/common';
-import {
-  ApiBearerAuth,
-  ApiOperation,
-  ApiResponse,
-  ApiTags,
+import { 
+    Controller,
+    Get,
+    Post,
+    Body,
+    Req,
+    UseGuards
+ } from '@nestjs/common';
+ import { 
+    ApiBearerAuth, 
+    ApiOperation, 
+    ApiResponse,
+    ApiTags 
 } from '@nestjs/swagger';
-import { AuthService } from './auth.service';
-import { LoginDto } from './dto/login.dto';
-import { JwtAuthGuard } from './guards/jwt-auth.guard';
+ import { AuthService } from './auth.service';
+ import { LoginDto } from './dto/login.dto';
+ import { JwtAuthGuard } from './guards/jwt-auth.guard';
 
  @ApiTags('Autenticação')
  @Controller('auth')
  export class AuthController {
     constructor(private readonly authService: AuthService) {}
 
-  @ApiOperation({
-    summary: 'Realizar login',
-  })
-  @ApiResponse({
-    status: 200,
-    description: 'Usuário autenticado com sucesso',
-  })
-  @Post('login')
-  login(@Body() dto: LoginDto) {
-    return this.authService.login(dto);
-  }
+    @ApiOperation({
+        summary: 'Realizar login'
+    })
 
-  @ApiBearerAuth()
-  @ApiOperation({
-    summary: 'Retorna dados do usuário autenticado',
-  })
-  @UseGuards(JwtAuthGuard)
-  @Get('me')
-  me(@Req() req: any) {
-    return this.authService.me(req.user.id);
-  }
+    @ApiResponse({
+        status: 200,
+        description: 'Usuário autenticado com sucesso',
+    })
+    @Post('login')
+    login(
+        @Body() dto: LoginDto,
+    ) {
+        return this.authService.login(dto);
+    }
 
     @ApiBearerAuth()
     @ApiOperation({
