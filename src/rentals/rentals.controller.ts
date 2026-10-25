@@ -41,11 +41,11 @@ export class RentalsController {
   constructor(private readonly rentals: RentalsService) {}
 
   @Post()
-  @ApiOperation({ summary: 'Criar um novo aluguel' })
+  @ApiOperation({ summary: 'Criar aluguel' })
   @ApiBody({ type: CreateRentalDto })
   @ApiResponse({
     status: 201,
-    description: 'Aluguel registrado e estoque do jogo atualizado.',
+    description: 'Aluguel registrado e estoque atualizado.',
   })
   create(
     @Body() dto: CreateRentalDto,
@@ -56,8 +56,8 @@ export class RentalsController {
 
   @Get()
   @UseInterceptors(CacheInterceptor)
-  @ApiOperation({ summary: 'Listar aluguéis com filtros e paginação' })
-  @ApiResponse({ status: 200, description: 'Lista paginada de aluguéis.' })
+  @ApiOperation({ summary: 'Listar aluguéis' })
+  @ApiResponse({ status: 200, description: 'Lista de aluguéis.' })
   findAll(
     @Query() query: ListRentalsDto,
     @Req() request: AuthenticatedRequest,
@@ -67,10 +67,10 @@ export class RentalsController {
 
   @Get('active')
   @UseInterceptors(CacheInterceptor)
-  @ApiOperation({ summary: 'Listar aluguéis ativos com filtros e paginação' })
+  @ApiOperation({ summary: 'Listar aluguéis em andamento' })
   @ApiResponse({
     status: 200,
-    description: 'Lista paginada de aluguéis ativos.',
+    description: 'Lista de aluguéis em andamento.',
   })
   findActive(
     @Query() query: ListRentalsDto,
@@ -81,12 +81,10 @@ export class RentalsController {
 
   @Get('overdue')
   @UseInterceptors(CacheInterceptor)
-  @ApiOperation({
-    summary: 'Listar aluguéis atrasados com filtros e paginação',
-  })
+  @ApiOperation({ summary: 'Listar aluguéis em atraso' })
   @ApiResponse({
     status: 200,
-    description: 'Lista paginada de aluguéis atrasados.',
+    description: 'Lista de aluguéis em atraso.',
   })
   findOverdue(
     @Query() query: ListRentalsDto,
@@ -96,11 +94,11 @@ export class RentalsController {
   }
 
   @Get('user/:userId')
-  @ApiOperation({ summary: 'Listar histórico paginado de um usuário' })
+  @ApiOperation({ summary: 'Listar histórico do usuário' })
   @ApiParam({ name: 'userId', description: 'ID do usuário', type: Number })
   @ApiResponse({
     status: 200,
-    description: 'Histórico paginado de aluguéis do usuário.',
+    description: 'Histórico de aluguéis do usuário.',
   })
   findByUser(
     @Param('userId', ParseIntPipe) userId: number,
@@ -111,7 +109,7 @@ export class RentalsController {
   }
 
   @Get(':id')
-  @ApiOperation({ summary: 'Buscar aluguel pelo ID' })
+  @ApiOperation({ summary: 'Buscar aluguel por ID' })
   @ApiParam({ name: 'id', description: 'ID do aluguel', type: Number })
   @ApiResponse({ status: 200, description: 'Detalhes do aluguel.' })
   findOne(
@@ -122,7 +120,7 @@ export class RentalsController {
   }
 
   @Patch(':id/return')
-  @ApiOperation({ summary: 'Registrar devolução de um jogo' })
+  @ApiOperation({ summary: 'Registrar devolução' })
   @ApiParam({ name: 'id', description: 'ID do aluguel', type: Number })
   @ApiResponse({ status: 200, description: 'Devolução registrada.' })
   returnRental(
@@ -133,7 +131,7 @@ export class RentalsController {
   }
 
   @Patch(':id/cancel')
-  @ApiOperation({ summary: 'Cancelar um aluguel ativo' })
+  @ApiOperation({ summary: 'Cancelar aluguel' })
   @ApiParam({ name: 'id', description: 'ID do aluguel', type: Number })
   @ApiResponse({ status: 200, description: 'Aluguel cancelado.' })
   cancel(
@@ -144,10 +142,10 @@ export class RentalsController {
   }
 
   @Patch(':id/extend')
-  @ApiOperation({ summary: 'Prorrogar a data de devolução' })
+  @ApiOperation({ summary: 'Prorrogar devolução' })
   @ApiBody({ type: ExtendRentalDto })
   @ApiParam({ name: 'id', description: 'ID do aluguel', type: Number })
-  @ApiResponse({ status: 200, description: 'Prazo do aluguel prorrogado.' })
+  @ApiResponse({ status: 200, description: 'Prazo prorrogado.' })
   extend(
     @Param('id', ParseIntPipe) id: number,
     @Body() dto: ExtendRentalDto,
@@ -159,7 +157,7 @@ export class RentalsController {
   @Delete(':id')
   @UseGuards(RolesGuard)
   @Roles('ADMIN')
-  @ApiOperation({ summary: 'Excluir um aluguel sem pagamentos associados' })
+  @ApiOperation({ summary: 'Excluir aluguel' })
   @ApiParam({ name: 'id', description: 'ID do aluguel', type: Number })
   @ApiResponse({ status: 200, description: 'Aluguel excluído.' })
   remove(

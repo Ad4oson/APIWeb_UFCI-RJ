@@ -52,8 +52,8 @@ export class PaymentsController {
 
   @Get()
   @UseInterceptors(CacheInterceptor)
-  @ApiOperation({ summary: 'Listar pagamentos com filtros e paginação' })
-  @ApiResponse({ status: 200, description: 'Lista paginada de pagamentos.' })
+  @ApiOperation({ summary: 'Listar todos os pagamentos' })
+  @ApiResponse({ status: 200, description: 'Lista de pagamentos.' })
   findAll(
     @Query() query: ListPaymentsDto,
     @Req() request: AuthenticatedRequest,
@@ -64,11 +64,11 @@ export class PaymentsController {
   @Get('pending')
   @UseInterceptors(CacheInterceptor)
   @ApiOperation({
-    summary: 'Listar pagamentos pendentes com filtros e paginação',
+    summary: 'Consultar pagamentos pendentes',
   })
   @ApiResponse({
     status: 200,
-    description: 'Lista paginada de pagamentos pendentes.',
+    description: 'Lista de pagamentos pendentes.',
   })
   findPending(
     @Query() query: ListPaymentsDto,
@@ -98,7 +98,7 @@ export class PaymentsController {
   })
   @ApiResponse({
     status: 200,
-    description: 'Lista paginada de pagamentos do aluguel.',
+    description: 'Lista de pagamentos do aluguel.',
   })
   findByRental(
     @Param('rentalId', ParseIntPipe) rentalId: number,
@@ -141,7 +141,7 @@ export class PaymentsController {
   @Patch(':id/confirm')
   @UseGuards(RolesGuard)
   @Roles('ADMIN')
-  @ApiOperation({ summary: 'Confirmar pagamento como administrador' })
+  @ApiOperation({ summary: 'Confirmar pagamento' })
   @ApiParam({
     name: 'id',
     description: 'ID numérico do pagamento',
@@ -158,7 +158,7 @@ export class PaymentsController {
   @Patch(':id/refund')
   @UseGuards(RolesGuard)
   @Roles('ADMIN')
-  @ApiOperation({ summary: 'Estornar pagamento como administrador' })
+  @ApiOperation({ summary: 'Estornar pagamento' })
   @ApiParam({
     name: 'id',
     description: 'ID numérico do pagamento',
@@ -175,7 +175,7 @@ export class PaymentsController {
   @Delete(':id')
   @UseGuards(RolesGuard)
   @Roles('ADMIN')
-  @ApiOperation({ summary: 'Excluir pagamento como administrador' })
+  @ApiOperation({ summary: 'Excluir pagamento' })
   @ApiParam({
     name: 'id',
     description: 'ID numérico do pagamento',
