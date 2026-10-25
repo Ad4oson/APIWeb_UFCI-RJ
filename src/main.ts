@@ -8,6 +8,9 @@ async function bootstrap() {
   const app = await NestFactory.create(AppModule, {
     instrument: ObserveInstrument,
   });
+
+  app.enableCors();
+
   app.useGlobalPipes(
     new ValidationPipe({
       transform: true,
@@ -16,7 +19,7 @@ async function bootstrap() {
     }),
   );
 
-const config = new DocumentBuilder()
+  const config = new DocumentBuilder()
     .setTitle('API de Aluguéis de Jogos de Tabuleiro - WeB')
     .setDescription('Sistema desenvolvido para organização de estoque, locações, transações e controle de acesso de jogos.')
     .setVersion('1.0')
@@ -28,6 +31,7 @@ const config = new DocumentBuilder()
     .addTag('Aluguéis')
     .addTag('Pagamentos')
     .build();
+    
   const document = SwaggerModule.createDocument(app, config);
   SwaggerModule.setup('api', app, document);
 
